@@ -1,0 +1,493 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="2200" height="1380" viewBox="0 0 2200 1380" content="&lt;mxfile host=&quot;app.diagrams.net&quot; type=&quot;device&quot; agent=&quot;stationBalance/docs&quot;&gt;
+  &lt;diagram id=&quot;aws-arch&quot; name=&quot;AWS Architecture&quot;&gt;
+    &lt;mxGraphModel dx=&quot;1600&quot; dy=&quot;900&quot; grid=&quot;1&quot; gridSize=&quot;10&quot; guides=&quot;1&quot; tooltips=&quot;1&quot; connect=&quot;1&quot; arrows=&quot;1&quot; fold=&quot;1&quot; page=&quot;1&quot; pageScale=&quot;1&quot; pageWidth=&quot;2200&quot; pageHeight=&quot;1380&quot; math=&quot;0&quot; shadow=&quot;0&quot;&gt;
+      &lt;root&gt;
+        &lt;mxCell id=&quot;0&quot; /&gt;
+        &lt;mxCell id=&quot;1&quot; parent=&quot;0&quot; /&gt;
+        &lt;mxCell id=&quot;t1&quot; value=&quot;Indego Station Capacity — AWS Architecture&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#232F3E;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;44&quot; width=&quot;900&quot; height=&quot;28&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;t2&quot; value=&quot;Pipeline 1 (batch: ingest → reconstruct → train) and Pipeline 2 (inference → serve). Numbered badges follow the primary data path.&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#5A6C74;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;74&quot; width=&quot;1000&quot; height=&quot;18&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lx1&quot; value=&quot;EXTERNAL SOURCES — TRAINING&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=10;fontStyle=1;fontColor=#879196;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;312&quot; width=&quot;260&quot; height=&quot;16&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;s1&quot; value=&quot;&amp;lt;b&amp;gt;Indego Trip ZIPs&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;5.16 M trips · 2022 Q1–2026 Q2&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F3F3;strokeColor=#879196;fontSize=11;fontColor=#232F3E;align=left;spacingLeft=10;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;340&quot; width=&quot;200&quot; height=&quot;52&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;s2&quot; value=&quot;&amp;lt;b&amp;gt;Open-Meteo Historical Forecast&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;hourly · verified 2018-01-01+&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F3F3;strokeColor=#879196;fontSize=11;fontColor=#232F3E;align=left;spacingLeft=10;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;404&quot; width=&quot;200&quot; height=&quot;52&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;s3&quot; value=&quot;&amp;lt;b&amp;gt;PASDA + ArcGIS&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;centerlines · bike network&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F3F3;strokeColor=#879196;fontSize=11;fontColor=#232F3E;align=left;spacingLeft=10;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;468&quot; width=&quot;200&quot; height=&quot;52&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;s4&quot; value=&quot;&amp;lt;b&amp;gt;PGW SOAP GetEUNHistory&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;closure history · Dec 2009+&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F3F3;strokeColor=#879196;fontSize=11;fontColor=#232F3E;align=left;spacingLeft=10;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;532&quot; width=&quot;200&quot; height=&quot;52&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;s5&quot; value=&quot;&amp;lt;b&amp;gt;GBFS station_status&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;live snapshot · no archive&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F3F3;strokeColor=#879196;fontSize=11;fontColor=#232F3E;align=left;spacingLeft=10;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;596&quot; width=&quot;200&quot; height=&quot;52&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;lx2&quot; value=&quot;EXTERNAL SOURCES — INFERENCE&quot; style=&quot;text;html=1;align=left;verticalAlign=middle;fontSize=10;fontStyle=1;fontColor=#879196;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;922&quot; width=&quot;260&quot; height=&quot;16&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;s6&quot; value=&quot;&amp;lt;b&amp;gt;Open-Meteo Forecast&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;live · vars pinned by features.yaml&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F3F3;strokeColor=#879196;fontSize=11;fontColor=#232F3E;align=left;spacingLeft=10;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;948&quot; width=&quot;200&quot; height=&quot;52&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;s7&quot; value=&quot;&amp;lt;b&amp;gt;ArcGIS closure layer&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;current state · same 150 m buffer&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F3F3;strokeColor=#879196;fontSize=11;fontColor=#232F3E;align=left;spacingLeft=10;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;1012&quot; width=&quot;200&quot; height=&quot;52&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;web&quot; value=&quot;&amp;lt;b&amp;gt;Web Tool&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;OUT OF SCOPE — map + tendency graph&amp;lt;/font&amp;gt;&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F3F3;strokeColor=#879196;fontSize=11;fontColor=#232F3E;align=left;spacingLeft=10;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;1970&quot; y=&quot;1032&quot; width=&quot;160&quot; height=&quot;74&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;awscloud&quot; value=&quot;AWS Cloud&quot; style=&quot;points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_aws_cloud_alt;strokeColor=#232F3E;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#232F3E;dashed=0;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;280&quot; y=&quot;100&quot; width=&quot;1660&quot; height=&quot;1180&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;region&quot; value=&quot;Region — us-east-1&quot; style=&quot;points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_region;strokeColor=#147EBA;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#147EBA;dashed=1;&quot; vertex=&quot;1&quot; parent=&quot;awscloud&quot;&gt;
+          &lt;mxGeometry x=&quot;50&quot; y=&quot;140&quot; width=&quot;1380&quot; height=&quot;1060&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;band1&quot; value=&quot;CONTROL PLANE&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#879196;dashed=1;dashPattern=8 8;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4;fontSize=11;fontColor=#5A6C74;fontStyle=2;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;90&quot; width=&quot;1300&quot; height=&quot;140&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;sfn&quot; value=&quot;&amp;lt;b&amp;gt;Step Functions&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;pipeline DAG · Map over 68 quarters&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F34482;gradientDirection=north;fillColor=#BC1356;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.step_functions;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;100&quot; y=&quot;102&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;eb&quot; value=&quot;&amp;lt;b&amp;gt;EventBridge&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;5 min · hourly · daily&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F34482;gradientDirection=north;fillColor=#BC1356;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.eventbridge;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;500&quot; y=&quot;102&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;cw&quot; value=&quot;&amp;lt;b&amp;gt;CloudWatch&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;logs · metrics · budget alarm&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F34482;gradientDirection=north;fillColor=#BC1356;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudwatch;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;900&quot; y=&quot;102&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;band2&quot; value=&quot;PIPELINE 1 — BATCH&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#879196;dashed=1;dashPattern=8 8;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4;fontSize=11;fontColor=#5A6C74;fontStyle=2;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;260&quot; width=&quot;1300&quot; height=&quot;380&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;g1&quot; value=&quot;&amp;lt;b&amp;gt;Lambda&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;archives · weather · geo&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F78E04;gradientDirection=north;fillColor=#D05C17;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;60&quot; y=&quot;290&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;g2&quot; value=&quot;&amp;lt;b&amp;gt;ECS Fargate&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;PGW backfill · 68 quarters&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F78E04;gradientDirection=north;fillColor=#D05C17;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.fargate;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;60&quot; y=&quot;430&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;g3&quot; value=&quot;&amp;lt;b&amp;gt;Lambda&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;station_status poller&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F78E04;gradientDirection=north;fillColor=#D05C17;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;60&quot; y=&quot;570&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;g4&quot; value=&quot;&amp;lt;b&amp;gt;Kinesis Data Firehose&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;5 min buffer → Parquet&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#945DF2;gradientDirection=north;fillColor=#5A30B5;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.kinesis_data_firehose;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;60&quot; y=&quot;685&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;s3raw&quot; value=&quot;&amp;lt;b&amp;gt;Amazon S3&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;/raw + /bronze · immutable&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#60A337;gradientDirection=north;fillColor=#277116;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;280&quot; y=&quot;360&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;emr&quot; value=&quot;&amp;lt;b&amp;gt;EMR Serverless&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;Spark + Sedona · phases 2–5&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#945DF2;gradientDirection=north;fillColor=#5A30B5;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.emr;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;500&quot; y=&quot;360&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;s3gold&quot; value=&quot;&amp;lt;b&amp;gt;Amazon S3&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;/gold · ~10 M rows · 1–2 GB&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#60A337;gradientDirection=north;fillColor=#277116;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;720&quot; y=&quot;360&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;sm&quot; value=&quot;&amp;lt;b&amp;gt;SageMaker Training&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;LightGBM · ml.m5.4xlarge&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#4AB29A;gradientDirection=north;fillColor=#116D5B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sagemaker;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;940&quot; y=&quot;360&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;reg&quot; value=&quot;&amp;lt;b&amp;gt;SageMaker Model Registry&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;model + features.yaml + transformers&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#4AB29A;gradientDirection=north;fillColor=#116D5B;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.sagemaker;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;1160&quot; y=&quot;360&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;sec&quot; value=&quot;&amp;lt;b&amp;gt;Secrets Manager&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;third-party credentials&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F54749;gradientDirection=north;fillColor=#C7131F;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.secrets_manager;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;280&quot; y=&quot;590&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;glue&quot; value=&quot;&amp;lt;b&amp;gt;Glue Data Catalog&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;Iceberg schema registry&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#945DF2;gradientDirection=north;fillColor=#5A30B5;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.glue;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;500&quot; y=&quot;590&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;ath&quot; value=&quot;&amp;lt;b&amp;gt;Athena&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;QA gates · ledger diagnostics&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#945DF2;gradientDirection=north;fillColor=#5A30B5;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.athena;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;720&quot; y=&quot;590&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;band3&quot; value=&quot;PIPELINE 2 — INFERENCE AND SERVING&quot; style=&quot;rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#879196;dashed=1;dashPattern=8 8;verticalAlign=top;align=left;spacingLeft=12;spacingTop=4;fontSize=11;fontColor=#5A6C74;fontStyle=2;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;40&quot; y=&quot;815&quot; width=&quot;1300&quot; height=&quot;300&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;inf&quot; value=&quot;&amp;lt;b&amp;gt;Lambda — inference&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;predict net_flow → P(empty)&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F78E04;gradientDirection=north;fillColor=#D05C17;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;500&quot; y=&quot;850&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;stat&quot; value=&quot;&amp;lt;b&amp;gt;Lambda — status refresh&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;keeps map dots live&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#F78E04;gradientDirection=north;fillColor=#D05C17;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.lambda;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;500&quot; y=&quot;990&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;ddb&quot; value=&quot;&amp;lt;b&amp;gt;DynamoDB&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;SNAPSHOT#CURRENT · STATION#id&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#4D72F3;gradientDirection=north;fillColor=#3334B9;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.dynamodb;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;720&quot; y=&quot;920&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;api&quot; value=&quot;&amp;lt;b&amp;gt;API Gateway&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;HTTP API · /stations /forecast&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#945DF2;gradientDirection=north;fillColor=#5A30B5;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.api_gateway;&quot; vertex=&quot;1&quot; parent=&quot;region&quot;&gt;
+          &lt;mxGeometry x=&quot;940&quot; y=&quot;920&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;cf&quot; value=&quot;&amp;lt;b&amp;gt;CloudFront&amp;lt;/b&amp;gt;&amp;lt;br&amp;gt;&amp;lt;font style='font-size:10px'&amp;gt;global edge cache&amp;lt;/font&amp;gt;&quot; style=&quot;sketch=0;points=[[0,0,0],[0.25,0,0],[0.5,0,0],[0.75,0,0],[1,0,0],[0,1,0],[0.25,1,0],[0.5,1,0],[0.75,1,0],[1,1,0],[0,0.25,0],[0,0.5,0],[0,0.75,0],[1,0.25,0],[1,0.5,0],[1,0.75,0]];outlineConnect=0;fontColor=#232F3E;gradientColor=#945DF2;gradientDirection=north;fillColor=#5A30B5;strokeColor=#ffffff;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;fontStyle=0;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.cloudfront;&quot; vertex=&quot;1&quot; parent=&quot;awscloud&quot;&gt;
+          &lt;mxGeometry x=&quot;1510&quot; y=&quot;1000&quot; width=&quot;78&quot; height=&quot;78&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e1&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s1&quot; target=&quot;g1&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e2&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s2&quot; target=&quot;g1&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e3&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s3&quot; target=&quot;g1&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e4&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s4&quot; target=&quot;g2&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e5&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s5&quot; target=&quot;g3&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e6&quot; value=&quot;every 5 min&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;g3&quot; target=&quot;g4&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e7&quot; value=&quot;land to /raw&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;g1&quot; target=&quot;s3raw&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e8&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;g2&quot; target=&quot;s3raw&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e9&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;g4&quot; target=&quot;s3raw&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;
+            &lt;Array as=&quot;points&quot;&gt;
+              &lt;mxPoint x=&quot;525&quot; y=&quot;844&quot; /&gt;
+              &lt;mxPoint x=&quot;525&quot; y=&quot;600&quot; /&gt;
+            &lt;/Array&gt;
+          &lt;/mxGeometry&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e10&quot; value=&quot;read&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s3raw&quot; target=&quot;emr&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e11&quot; value=&quot;write bronze / silver&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;dashed=1;dashPattern=6 5;strokeColor=#879196;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;emr&quot; target=&quot;s3raw&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;
+            &lt;Array as=&quot;points&quot;&gt;
+              &lt;mxPoint x=&quot;869&quot; y=&quot;605&quot; /&gt;
+              &lt;mxPoint x=&quot;649&quot; y=&quot;605&quot; /&gt;
+            &lt;/Array&gt;
+          &lt;/mxGeometry&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e12&quot; value=&quot;writes /gold&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;emr&quot; target=&quot;s3gold&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e13&quot; value=&quot;~10 M rows&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s3gold&quot; target=&quot;sm&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e14&quot; value=&quot;model + metrics&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;sm&quot; target=&quot;reg&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e15&quot; value=&quot;artifact bundle&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;reg&quot; target=&quot;inf&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;
+            &lt;Array as=&quot;points&quot;&gt;
+              &lt;mxPoint x=&quot;1529&quot; y=&quot;830&quot; /&gt;
+              &lt;mxPoint x=&quot;869&quot; y=&quot;830&quot; /&gt;
+            &lt;/Array&gt;
+          &lt;/mxGeometry&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e16&quot; value=&quot;catalogs&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;dashed=1;dashPattern=6 5;strokeColor=#879196;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;glue&quot; target=&quot;emr&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e17&quot; value=&quot;QA gates&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s3gold&quot; target=&quot;ath&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e18&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;dashed=1;dashPattern=6 5;strokeColor=#879196;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;glue&quot; target=&quot;ath&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e19&quot; value=&quot;credentials&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;dashed=1;dashPattern=6 5;strokeColor=#879196;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;sec&quot; target=&quot;g2&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e20&quot; value=&quot;ledger validation (step 6.6) only — NEVER a training feature&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;dashed=1;dashPattern=6 5;strokeColor=#879196;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;g4&quot; target=&quot;sm&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;
+            &lt;Array as=&quot;points&quot;&gt;
+              &lt;mxPoint x=&quot;429&quot; y=&quot;890&quot; /&gt;
+              &lt;mxPoint x=&quot;1309&quot; y=&quot;890&quot; /&gt;
+            &lt;/Array&gt;
+          &lt;/mxGeometry&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e21&quot; value=&quot;O(s,t₀)&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;dashed=1;dashPattern=6 5;strokeColor=#879196;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s5&quot; target=&quot;inf&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;
+            &lt;Array as=&quot;points&quot;&gt;
+              &lt;mxPoint x=&quot;300&quot; y=&quot;999&quot; /&gt;
+            &lt;/Array&gt;
+          &lt;/mxGeometry&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e22&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s6&quot; target=&quot;inf&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e23&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s7&quot; target=&quot;inf&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e24&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;dashed=1;dashPattern=6 5;strokeColor=#879196;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;s5&quot; target=&quot;stat&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot;&gt;
+            &lt;Array as=&quot;points&quot;&gt;
+              &lt;mxPoint x=&quot;285&quot; y=&quot;1139&quot; /&gt;
+            &lt;/Array&gt;
+          &lt;/mxGeometry&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e25&quot; value=&quot;12 K predictions / refresh&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;inf&quot; target=&quot;ddb&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e26&quot; value=&quot;every 60 s&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;stat&quot; target=&quot;ddb&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e27&quot; value=&quot;1 read · &amp;lt;10 ms&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;ddb&quot; target=&quot;api&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e28&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;api&quot; target=&quot;cf&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e29&quot; value=&quot;60 s TTL&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;cf&quot; target=&quot;web&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e30&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;dashed=1;dashPattern=6 5;strokeColor=#879196;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;eb&quot; target=&quot;g3&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e31&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;dashed=1;dashPattern=6 5;strokeColor=#879196;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;eb&quot; target=&quot;inf&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;e32&quot; value=&quot;&quot; style=&quot;edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#545B64;strokeWidth=1.6;endArrow=blockThin;endFill=1;fontSize=10;fontColor=#232F3E;labelBackgroundColor=#FFFFFF;jettySize=auto;dashed=1;dashPattern=6 5;strokeColor=#879196;&quot; edge=&quot;1&quot; parent=&quot;1&quot; source=&quot;sfn&quot; target=&quot;emr&quot;&gt;
+          &lt;mxGeometry relative=&quot;1&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;b1&quot; value=&quot;1&quot; style=&quot;ellipse;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;525&quot; y=&quot;446&quot; width=&quot;28&quot; height=&quot;28&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;b2&quot; value=&quot;2&quot; style=&quot;ellipse;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;745&quot; y=&quot;481&quot; width=&quot;28&quot; height=&quot;28&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;b3&quot; value=&quot;3&quot; style=&quot;ellipse;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;965&quot; y=&quot;481&quot; width=&quot;28&quot; height=&quot;28&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;b4&quot; value=&quot;4&quot; style=&quot;ellipse;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;1185&quot; y=&quot;481&quot; width=&quot;28&quot; height=&quot;28&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;b5&quot; value=&quot;5&quot; style=&quot;ellipse;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;1405&quot; y=&quot;481&quot; width=&quot;28&quot; height=&quot;28&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;b6&quot; value=&quot;6&quot; style=&quot;ellipse;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;1251&quot; y=&quot;792&quot; width=&quot;28&quot; height=&quot;28&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;b7&quot; value=&quot;7&quot; style=&quot;ellipse;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;965&quot; y=&quot;1006&quot; width=&quot;28&quot; height=&quot;28&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+        &lt;mxCell id=&quot;b8&quot; value=&quot;8&quot; style=&quot;ellipse;whiteSpace=wrap;html=1;fillColor=#232F3E;strokeColor=none;fontColor=#ffffff;fontSize=13;fontStyle=1;&quot; vertex=&quot;1&quot; parent=&quot;1&quot;&gt;
+          &lt;mxGeometry x=&quot;1185&quot; y=&quot;1041&quot; width=&quot;28&quot; height=&quot;28&quot; as=&quot;geometry&quot; /&gt;
+        &lt;/mxCell&gt;
+      &lt;/root&gt;
+    &lt;/mxGraphModel&gt;
+  &lt;/diagram&gt;
+&lt;/mxfile&gt;">
+<rect width="2200" height="1380" fill="#ffffff"/>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#545B64"/></marker><marker id="ad" viewBox="0 0 10 10" refX="9.2" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#879196"/></marker></defs>
+<g font-family="Helvetica, Arial, sans-serif">
+<rect x="280" y="100" width="1660" height="1180" rx="10" fill="none" stroke="#232F3E" stroke-width="2.2"/>
+<text x="296" y="122" font-size="13" font-weight="600" fill="#232F3E">AWS Cloud</text>
+<rect x="330" y="180" width="1380" height="1060" rx="10" fill="none" stroke="#147EBA" stroke-width="2" stroke-dasharray="9 6"/>
+<text x="346" y="202" font-size="13" font-weight="600" fill="#147EBA">Region — us-east-1</text>
+<rect x="370" y="210" width="1300" height="140" rx="10" fill="none" stroke="#879196" stroke-width="1.4" stroke-dasharray="8 8"/>
+<text x="386" y="232" font-size="11" font-weight="500" fill="#5A6C74" letter-spacing="0.8">CONTROL PLANE</text>
+<rect x="370" y="380" width="1300" height="380" rx="10" fill="none" stroke="#879196" stroke-width="1.4" stroke-dasharray="8 8"/>
+<text x="386" y="402" font-size="11" font-weight="500" fill="#5A6C74" letter-spacing="0.8">PIPELINE 1 — BATCH</text>
+<rect x="370" y="935" width="1300" height="300" rx="10" fill="none" stroke="#879196" stroke-width="1.4" stroke-dasharray="8 8"/>
+<text x="386" y="957" font-size="11" font-weight="500" fill="#5A6C74" letter-spacing="0.8">PIPELINE 2 — INFERENCE AND SERVING</text>
+<path d="M 140.0 392.0 L 256.0 392.0 Q 265.0 392.0 265.0 401.0 L 265.0 440.0 Q 265.0 449.0 274.0 449.0 L 390.0 449.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<path d="M 240.0 430.0 L 306.0 430.0 Q 315.0 430.0 315.0 439.0 L 315.0 440.0 Q 315.0 449.0 324.0 449.0 L 390.0 449.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<path d="M 240.0 494.0 L 306.0 494.0 Q 315.0 494.0 315.0 485.0 L 315.0 458.0 Q 315.0 449.0 324.0 449.0 L 390.0 449.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<path d="M 240.0 558.0 L 306.0 558.0 Q 315.0 558.0 315.0 567.0 L 315.0 580.0 Q 315.0 589.0 324.0 589.0 L 390.0 589.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<path d="M 140.0 648.0 L 256.0 648.0 Q 265.0 648.0 265.0 657.0 L 265.0 720.0 Q 265.0 729.0 274.0 729.0 L 390.0 729.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<path d="M 429.0 768.0 L 429.0 786.5 Q 429.0 786.5 429.0 786.5 L 429.0 786.5 Q 429.0 786.5 429.0 786.5 L 429.0 805.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="396.5" y="769.8" width="65.0" height="15" fill="#ffffff" rx="2"/>
+<text x="429.0" y="780.5" font-size="10" fill="#232F3E" text-anchor="middle">every 5 min</text>
+<path d="M 468.0 449.0 L 530.0 449.0 Q 539.0 449.0 539.0 458.0 L 539.0 510.0 Q 539.0 519.0 548.0 519.0 L 610.0 519.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="468.5" y="441.5" width="70.0" height="15" fill="#ffffff" rx="2"/>
+<text x="503.5" y="452.2" font-size="10" fill="#232F3E" text-anchor="middle">land to /raw</text>
+<path d="M 468.0 589.0 L 530.0 589.0 Q 539.0 589.0 539.0 580.0 L 539.0 528.0 Q 539.0 519.0 548.0 519.0 L 610.0 519.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<path d="M 468.0 844.0 L 516.0 844.0 Q 525.0 844.0 525.0 835.0 L 525.0 609.0 Q 525.0 600.0 534.0 600.0 L 601.0 600.0 Q 610.0 600.0 610.0 591.0 L 610.0 519.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<path d="M 688.0 519.0 L 759.0 519.0 Q 759.0 519.0 759.0 519.0 L 759.0 519.0 Q 759.0 519.0 759.0 519.0 L 830.0 519.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="708.5" y="511.5" width="30.0" height="15" fill="#ffffff" rx="2"/>
+<text x="723.5" y="522.2" font-size="10" fill="#232F3E" text-anchor="middle">read</text>
+<path d="M 869.0 558.0 L 869.0 596.0 Q 869.0 605.0 860.0 605.0 L 658.0 605.0 Q 649.0 605.0 649.0 596.0 L 649.0 558.0" fill="none" stroke="#879196" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#ad)"/>
+<rect x="701.5" y="597.5" width="115.0" height="15" fill="#ffffff" rx="2"/>
+<text x="759.0" y="608.2" font-size="10" fill="#232F3E" text-anchor="middle">write bronze / silver</text>
+<path d="M 908.0 519.0 L 979.0 519.0 Q 979.0 519.0 979.0 519.0 L 979.0 519.0 Q 979.0 519.0 979.0 519.0 L 1050.0 519.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="908.5" y="511.5" width="70.0" height="15" fill="#ffffff" rx="2"/>
+<text x="943.5" y="522.2" font-size="10" fill="#232F3E" text-anchor="middle">writes /gold</text>
+<path d="M 1128.0 519.0 L 1199.0 519.0 Q 1199.0 519.0 1199.0 519.0 L 1199.0 519.0 Q 1199.0 519.0 1199.0 519.0 L 1270.0 519.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="1133.5" y="511.5" width="60.0" height="15" fill="#ffffff" rx="2"/>
+<text x="1163.5" y="522.2" font-size="10" fill="#232F3E" text-anchor="middle">~10 M rows</text>
+<path d="M 1348.0 519.0 L 1419.0 519.0 Q 1419.0 519.0 1419.0 519.0 L 1419.0 519.0 Q 1419.0 519.0 1419.0 519.0 L 1490.0 519.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="1341.0" y="511.5" width="85.0" height="15" fill="#ffffff" rx="2"/>
+<text x="1383.5" y="522.2" font-size="10" fill="#232F3E" text-anchor="middle">model + metrics</text>
+<path d="M 1529.0 558.0 L 1529.0 821.0 Q 1529.0 830.0 1520.0 830.0 L 878.0 830.0 Q 869.0 830.0 869.0 839.0 L 869.0 970.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="1156.5" y="822.5" width="85.0" height="15" fill="#ffffff" rx="2"/>
+<text x="1199.0" y="833.2" font-size="10" fill="#232F3E" text-anchor="middle">artifact bundle</text>
+<path d="M 869.0 710.0 L 869.0 634.0 Q 869.0 634.0 869.0 634.0 L 869.0 634.0 Q 869.0 634.0 869.0 634.0 L 869.0 558.0" fill="none" stroke="#879196" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#ad)"/>
+<rect x="844.0" y="664.5" width="50.0" height="15" fill="#ffffff" rx="2"/>
+<text x="869.0" y="675.2" font-size="10" fill="#232F3E" text-anchor="middle">catalogs</text>
+<path d="M 1089.0 558.0 L 1089.0 634.0 Q 1089.0 634.0 1089.0 634.0 L 1089.0 634.0 Q 1089.0 634.0 1089.0 634.0 L 1089.0 710.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="1064.0" y="588.5" width="50.0" height="15" fill="#ffffff" rx="2"/>
+<text x="1089.0" y="599.2" font-size="10" fill="#232F3E" text-anchor="middle">QA gates</text>
+<path d="M 908.0 749.0 L 979.0 749.0 Q 979.0 749.0 979.0 749.0 L 979.0 749.0 Q 979.0 749.0 979.0 749.0 L 1050.0 749.0" fill="none" stroke="#879196" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#ad)"/>
+<path d="M 610.0 749.0 L 548.0 749.0 Q 539.0 749.0 539.0 740.0 L 539.0 598.0 Q 539.0 589.0 530.0 589.0 L 468.0 589.0" fill="none" stroke="#879196" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#ad)"/>
+<rect x="506.5" y="661.5" width="65.0" height="15" fill="#ffffff" rx="2"/>
+<text x="539.0" y="672.2" font-size="10" fill="#232F3E" text-anchor="middle">credentials</text>
+<path d="M 429.0 883.0 L 429.0 886.5 Q 429.0 890.0 432.5 890.0 L 1300.0 890.0 Q 1309.0 890.0 1309.0 881.0 L 1309.0 558.0" fill="none" stroke="#879196" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#ad)"/>
+<rect x="714.0" y="882.5" width="310.0" height="15" fill="#ffffff" rx="2"/>
+<text x="869.0" y="893.2" font-size="10" fill="#232F3E" text-anchor="middle">ledger validation (step 6.6) only — NEVER a training feature</text>
+<path d="M 140.0 648.0 L 291.0 648.0 Q 300.0 648.0 300.0 657.0 L 300.0 990.0 Q 300.0 999.0 309.0 999.0 L 825.0 999.0 Q 830.0 999.0 830.0 1004.0 L 830.0 1009.0" fill="none" stroke="#879196" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#ad)"/>
+<rect x="542.5" y="991.5" width="45.0" height="15" fill="#ffffff" rx="2"/>
+<text x="565.0" y="1002.2" font-size="10" fill="#232F3E" text-anchor="middle">O(s,t₀)</text>
+<path d="M 240.0 974.0 L 526.0 974.0 Q 535.0 974.0 535.0 983.0 L 535.0 1000.0 Q 535.0 1009.0 544.0 1009.0 L 830.0 1009.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<path d="M 240.0 1038.0 L 526.0 1038.0 Q 535.0 1038.0 535.0 1029.0 L 535.0 1018.0 Q 535.0 1009.0 544.0 1009.0 L 830.0 1009.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<path d="M 140.0 648.0 L 276.0 648.0 Q 285.0 648.0 285.0 657.0 L 285.0 1130.0 Q 285.0 1139.0 294.0 1139.0 L 825.0 1139.0 Q 830.0 1139.0 830.0 1144.0 L 830.0 1149.0" fill="none" stroke="#879196" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#ad)"/>
+<path d="M 908.0 1009.0 L 970.0 1009.0 Q 979.0 1009.0 979.0 1018.0 L 979.0 1070.0 Q 979.0 1079.0 988.0 1079.0 L 1050.0 1079.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="873.5" y="1001.5" width="140.0" height="15" fill="#ffffff" rx="2"/>
+<text x="943.5" y="1012.2" font-size="10" fill="#232F3E" text-anchor="middle">12 K predictions / refresh</text>
+<path d="M 908.0 1149.0 L 970.0 1149.0 Q 979.0 1149.0 979.0 1140.0 L 979.0 1088.0 Q 979.0 1079.0 988.0 1079.0 L 1050.0 1079.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="913.5" y="1141.5" width="60.0" height="15" fill="#ffffff" rx="2"/>
+<text x="943.5" y="1152.2" font-size="10" fill="#232F3E" text-anchor="middle">every 60 s</text>
+<path d="M 1128.0 1079.0 L 1199.0 1079.0 Q 1199.0 1079.0 1199.0 1079.0 L 1199.0 1079.0 Q 1199.0 1079.0 1199.0 1079.0 L 1270.0 1079.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="1121.0" y="1071.5" width="85.0" height="15" fill="#ffffff" rx="2"/>
+<text x="1163.5" y="1082.2" font-size="10" fill="#232F3E" text-anchor="middle">1 read · &lt;10 ms</text>
+<path d="M 1348.0 1079.0 L 1569.0 1079.0 Q 1569.0 1079.0 1569.0 1079.0 L 1569.0 1079.0 Q 1569.0 1079.0 1569.0 1079.0 L 1790.0 1079.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<path d="M 1868.0 1079.0 L 1914.0 1079.0 Q 1919.0 1079.0 1919.0 1074.0 L 1919.0 1074.0 Q 1919.0 1069.0 1924.0 1069.0 L 1970.0 1069.0" fill="none" stroke="#545B64" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="1868.5" y="1071.5" width="50.0" height="15" fill="#ffffff" rx="2"/>
+<text x="1893.5" y="1082.2" font-size="10" fill="#232F3E" text-anchor="middle">60 s TTL</text>
+<path d="M 869.0 300.0 L 869.0 486.0 Q 869.0 495.0 860.0 495.0 L 438.0 495.0 Q 429.0 495.0 429.0 504.0 L 429.0 690.0" fill="none" stroke="#879196" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#ad)"/>
+<path d="M 869.0 300.0 L 869.0 635.0 Q 869.0 635.0 869.0 635.0 L 869.0 635.0 Q 869.0 635.0 869.0 635.0 L 869.0 970.0" fill="none" stroke="#879196" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#ad)"/>
+<path d="M 508.0 261.0 L 660.0 261.0 Q 669.0 261.0 669.0 270.0 L 669.0 510.0 Q 669.0 519.0 678.0 519.0 L 830.0 519.0" fill="none" stroke="#879196" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#ad)"/>
+<text x="40" y="64" font-size="21" font-weight="700" fill="#232F3E">Indego Station Capacity — AWS Architecture</text>
+<text x="40" y="87" font-size="11.5" fill="#5A6C74">Pipeline 1 (batch: ingest → reconstruct → train) and Pipeline 2 (inference → serve). Numbered badges follow the primary data path.</text>
+<text x="40" y="324" font-size="10" font-weight="700" fill="#879196" letter-spacing="1">EXTERNAL SOURCES — TRAINING</text>
+<rect x="40" y="340" width="200" height="52" rx="6" fill="#F2F3F3" stroke="#879196" stroke-width="1.2"/>
+<text x="51" y="361" font-size="11.5" font-weight="600" fill="#232F3E">Indego Trip ZIPs</text>
+<text x="51" y="377" font-size="10" fill="#5A6C74">5.16 M trips · 2022 Q1–2026 Q2</text>
+<rect x="40" y="404" width="200" height="52" rx="6" fill="#F2F3F3" stroke="#879196" stroke-width="1.2"/>
+<text x="51" y="425" font-size="11.5" font-weight="600" fill="#232F3E">Open-Meteo Historical Forecast</text>
+<text x="51" y="441" font-size="10" fill="#5A6C74">hourly · verified 2018-01-01+</text>
+<rect x="40" y="468" width="200" height="52" rx="6" fill="#F2F3F3" stroke="#879196" stroke-width="1.2"/>
+<text x="51" y="489" font-size="11.5" font-weight="600" fill="#232F3E">PASDA + ArcGIS</text>
+<text x="51" y="505" font-size="10" fill="#5A6C74">centerlines · bike network</text>
+<rect x="40" y="532" width="200" height="52" rx="6" fill="#F2F3F3" stroke="#879196" stroke-width="1.2"/>
+<text x="51" y="553" font-size="11.5" font-weight="600" fill="#232F3E">PGW SOAP GetEUNHistory</text>
+<text x="51" y="569" font-size="10" fill="#5A6C74">closure history · Dec 2009+</text>
+<rect x="40" y="596" width="200" height="52" rx="6" fill="#F2F3F3" stroke="#879196" stroke-width="1.2"/>
+<text x="51" y="617" font-size="11.5" font-weight="600" fill="#232F3E">GBFS station_status</text>
+<text x="51" y="633" font-size="10" fill="#5A6C74">live snapshot · no archive</text>
+<text x="40" y="934" font-size="10" font-weight="700" fill="#879196" letter-spacing="1">EXTERNAL SOURCES — INFERENCE</text>
+<rect x="40" y="948" width="200" height="52" rx="6" fill="#F2F3F3" stroke="#879196" stroke-width="1.2"/>
+<text x="51" y="969" font-size="11.5" font-weight="600" fill="#232F3E">Open-Meteo Forecast</text>
+<text x="51" y="985" font-size="10" fill="#5A6C74">live · vars pinned by features.yaml</text>
+<rect x="40" y="1012" width="200" height="52" rx="6" fill="#F2F3F3" stroke="#879196" stroke-width="1.2"/>
+<text x="51" y="1033" font-size="11.5" font-weight="600" fill="#232F3E">ArcGIS closure layer</text>
+<text x="51" y="1049" font-size="10" fill="#5A6C74">current state · same 150 m buffer</text>
+<rect x="1970" y="1032" width="160" height="74" rx="6" fill="#F2F3F3" stroke="#879196" stroke-width="1.2" stroke-dasharray="5 4"/>
+<text x="1981" y="1053" font-size="11.5" font-weight="600" fill="#232F3E">Web Tool</text>
+<text x="1981" y="1069" font-size="10" fill="#5A6C74">OUT OF SCOPE — map + tendency graph</text>
+<defs><linearGradient id="g_sfn" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#BC1356"/><stop offset="1" stop-color="#F34482"/></linearGradient></defs>
+<rect x="430" y="222" width="78" height="78" rx="12" fill="url(#g_sfn)"/>
+<rect x="449" y="241" width="19" height="13" rx="2.6" fill="#fff"/><rect x="470" y="268" width="19" height="13" rx="2.6" fill="#fff"/><path d="M458 254 v18 h11" fill="none" stroke="#fff" stroke-width="3.4"/>
+<text x="469.0" y="316" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">Step Functions</text>
+<text x="469.0" y="330" font-size="10" fill="#5A6C74" text-anchor="middle">pipeline DAG · Map over 68 quarters</text>
+<defs><linearGradient id="g_eb" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#BC1356"/><stop offset="1" stop-color="#F34482"/></linearGradient></defs>
+<rect x="830" y="222" width="78" height="78" rx="12" fill="url(#g_eb)"/>
+<circle cx="854" cy="261" r="6.4" fill="#fff"/><path d="M861 261 h10 M871 261 l11-12 M871 261 l11 12" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round"/><circle cx="884" cy="248" r="4.6" fill="#fff"/><circle cx="884" cy="274" r="4.6" fill="#fff"/>
+<text x="869.0" y="316" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">EventBridge</text>
+<text x="869.0" y="330" font-size="10" fill="#5A6C74" text-anchor="middle">5 min · hourly · daily</text>
+<defs><linearGradient id="g_cw" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#BC1356"/><stop offset="1" stop-color="#F34482"/></linearGradient></defs>
+<rect x="1230" y="222" width="78" height="78" rx="12" fill="url(#g_cw)"/>
+<path d="M1249 263 h8 l6-14 7.4 25 6-16 4.4 5h8" fill="none" stroke="#fff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1269.0" y="316" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">CloudWatch</text>
+<text x="1269.0" y="330" font-size="10" fill="#5A6C74" text-anchor="middle">logs · metrics · budget alarm</text>
+<defs><linearGradient id="g_g1" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#D05C17"/><stop offset="1" stop-color="#F78E04"/></linearGradient></defs>
+<rect x="390" y="410" width="78" height="78" rx="12" fill="url(#g_g1)"/>
+<path d="M407 469 h8 l9.5-25 9.8 25h8.2L425 429 h-6.6Z" fill="#fff"/>
+<text x="429.0" y="504" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">Lambda</text>
+<text x="429.0" y="518" font-size="10" fill="#5A6C74" text-anchor="middle">archives · weather · geo</text>
+<defs><linearGradient id="g_g2" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#D05C17"/><stop offset="1" stop-color="#F78E04"/></linearGradient></defs>
+<rect x="390" y="550" width="78" height="78" rx="12" fill="url(#g_g2)"/>
+<rect x="410" y="570" width="38" height="38" rx="4" fill="none" stroke="#fff" stroke-width="3.4"/><rect x="420" y="580" width="17" height="17" rx="2.4" fill="#fff"/>
+<text x="429.0" y="644" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">ECS Fargate</text>
+<text x="429.0" y="658" font-size="10" fill="#5A6C74" text-anchor="middle">PGW backfill · 68 quarters</text>
+<defs><linearGradient id="g_g3" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#D05C17"/><stop offset="1" stop-color="#F78E04"/></linearGradient></defs>
+<rect x="390" y="690" width="78" height="78" rx="12" fill="url(#g_g3)"/>
+<path d="M407 749 h8 l9.5-25 9.8 25h8.2L425 709 h-6.6Z" fill="#fff"/>
+<text x="429.0" y="784" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">Lambda</text>
+<text x="429.0" y="798" font-size="10" fill="#5A6C74" text-anchor="middle">station_status poller</text>
+<defs><linearGradient id="g_g4" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#5A30B5"/><stop offset="1" stop-color="#945DF2"/></linearGradient></defs>
+<rect x="390" y="805" width="78" height="78" rx="12" fill="url(#g_g4)"/>
+<path d="M411 825 h36 l-13.4 17.6V864 l-9.6-5V842 Z" fill="#fff"/>
+<text x="429.0" y="899" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">Kinesis Data Firehose</text>
+<text x="429.0" y="913" font-size="10" fill="#5A6C74" text-anchor="middle">5 min buffer → Parquet</text>
+<defs><linearGradient id="g_s3raw" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#277116"/><stop offset="1" stop-color="#60A337"/></linearGradient></defs>
+<rect x="610" y="480" width="78" height="78" rx="12" fill="url(#g_s3raw)"/>
+<ellipse cx="649" cy="501" rx="17" ry="4.6" fill="#fff"/><path d="M632 501 h34 l-4.3 32a3 3 0 0 1-2.4 2.5 62 62 0 0 1-20.6 0 3 3 0 0 1-2.4-2.5Z" fill="#fff"/>
+<text x="649.0" y="574" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">Amazon S3</text>
+<text x="649.0" y="588" font-size="10" fill="#5A6C74" text-anchor="middle">/raw + /bronze · immutable</text>
+<defs><linearGradient id="g_emr" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#5A30B5"/><stop offset="1" stop-color="#945DF2"/></linearGradient></defs>
+<rect x="830" y="480" width="78" height="78" rx="12" fill="url(#g_emr)"/>
+<rect x="851" y="497" width="36" height="4.6" rx="2.3" fill="#fff" opacity=".72"/><rect x="851" y="522" width="8.4" height="18" rx="2" fill="#fff"/><rect x="864" y="512" width="8.4" height="28" rx="2" fill="#fff"/><rect x="877" y="517" width="8.4" height="23" rx="2" fill="#fff"/>
+<text x="869.0" y="574" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">EMR Serverless</text>
+<text x="869.0" y="588" font-size="10" fill="#5A6C74" text-anchor="middle">Spark + Sedona · phases 2–5</text>
+<defs><linearGradient id="g_s3gold" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#277116"/><stop offset="1" stop-color="#60A337"/></linearGradient></defs>
+<rect x="1050" y="480" width="78" height="78" rx="12" fill="url(#g_s3gold)"/>
+<ellipse cx="1089" cy="501" rx="17" ry="4.6" fill="#fff"/><path d="M1072 501 h34 l-4.3 32a3 3 0 0 1-2.4 2.5 62 62 0 0 1-20.6 0 3 3 0 0 1-2.4-2.5Z" fill="#fff"/>
+<text x="1089.0" y="574" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">Amazon S3</text>
+<text x="1089.0" y="588" font-size="10" fill="#5A6C74" text-anchor="middle">/gold · ~10 M rows · 1–2 GB</text>
+<defs><linearGradient id="g_sm" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#116D5B"/><stop offset="1" stop-color="#4AB29A"/></linearGradient></defs>
+<rect x="1270" y="480" width="78" height="78" rx="12" fill="url(#g_sm)"/>
+<line x1="1294" y1="511" x2="1324" y2="511" stroke="#fff" stroke-width="3"/><line x1="1294" y1="511" x2="1309" y2="535" stroke="#fff" stroke-width="3"/><line x1="1324" y1="511" x2="1309" y2="535" stroke="#fff" stroke-width="3"/><circle cx="1294" cy="511" r="5.4" fill="#fff"/><circle cx="1324" cy="511" r="5.4" fill="#fff"/><circle cx="1309" cy="535" r="5.4" fill="#fff"/>
+<text x="1309.0" y="574" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">SageMaker Training</text>
+<text x="1309.0" y="588" font-size="10" fill="#5A6C74" text-anchor="middle">LightGBM · ml.m5.4xlarge</text>
+<defs><linearGradient id="g_reg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#116D5B"/><stop offset="1" stop-color="#4AB29A"/></linearGradient></defs>
+<rect x="1490" y="480" width="78" height="78" rx="12" fill="url(#g_reg)"/>
+<line x1="1514" y1="511" x2="1544" y2="511" stroke="#fff" stroke-width="3"/><line x1="1514" y1="511" x2="1529" y2="535" stroke="#fff" stroke-width="3"/><line x1="1544" y1="511" x2="1529" y2="535" stroke="#fff" stroke-width="3"/><circle cx="1514" cy="511" r="5.4" fill="#fff"/><circle cx="1544" cy="511" r="5.4" fill="#fff"/><circle cx="1529" cy="535" r="5.4" fill="#fff"/>
+<text x="1529.0" y="574" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">SageMaker Model Registry</text>
+<text x="1529.0" y="588" font-size="10" fill="#5A6C74" text-anchor="middle">model + features.yaml + transformers</text>
+<defs><linearGradient id="g_sec" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#C7131F"/><stop offset="1" stop-color="#F54749"/></linearGradient></defs>
+<rect x="610" y="710" width="78" height="78" rx="12" fill="url(#g_sec)"/>
+<circle cx="642" cy="743" r="9" fill="none" stroke="#fff" stroke-width="4"/><path d="M648 749 l17 17 m-6 -6 l5 5 m-10-1 l4 4" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+<text x="649.0" y="804" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">Secrets Manager</text>
+<text x="649.0" y="818" font-size="10" fill="#5A6C74" text-anchor="middle">third-party credentials</text>
+<defs><linearGradient id="g_glue" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#5A30B5"/><stop offset="1" stop-color="#945DF2"/></linearGradient></defs>
+<rect x="830" y="710" width="78" height="78" rx="12" fill="url(#g_glue)"/>
+<rect x="852" y="732" width="34" height="34" rx="3.4" fill="none" stroke="#fff" stroke-width="3.4"/><line x1="852" y1="744" x2="886" y2="744" stroke="#fff" stroke-width="3.4"/><line x1="869" y1="744" x2="869" y2="766" stroke="#fff" stroke-width="3.4"/>
+<text x="869.0" y="804" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">Glue Data Catalog</text>
+<text x="869.0" y="818" font-size="10" fill="#5A6C74" text-anchor="middle">Iceberg schema registry</text>
+<defs><linearGradient id="g_ath" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#5A30B5"/><stop offset="1" stop-color="#945DF2"/></linearGradient></defs>
+<rect x="1050" y="710" width="78" height="78" rx="12" fill="url(#g_ath)"/>
+<rect x="1073" y="729" width="32" height="5" rx="2" fill="#fff"/><rect x="1073" y="764" width="32" height="5" rx="2" fill="#fff"/><rect x="1078" y="734" width="6" height="26" fill="#fff"/><rect x="1094" y="734" width="6" height="26" fill="#fff"/>
+<text x="1089.0" y="804" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">Athena</text>
+<text x="1089.0" y="818" font-size="10" fill="#5A6C74" text-anchor="middle">QA gates · ledger diagnostics</text>
+<defs><linearGradient id="g_inf" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#D05C17"/><stop offset="1" stop-color="#F78E04"/></linearGradient></defs>
+<rect x="830" y="970" width="78" height="78" rx="12" fill="url(#g_inf)"/>
+<path d="M847 1029 h8 l9.5-25 9.8 25h8.2L865 989 h-6.6Z" fill="#fff"/>
+<text x="869.0" y="1064" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">Lambda — inference</text>
+<text x="869.0" y="1078" font-size="10" fill="#5A6C74" text-anchor="middle">predict net_flow → P(empty)</text>
+<defs><linearGradient id="g_stat" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#D05C17"/><stop offset="1" stop-color="#F78E04"/></linearGradient></defs>
+<rect x="830" y="1110" width="78" height="78" rx="12" fill="url(#g_stat)"/>
+<path d="M847 1169 h8 l9.5-25 9.8 25h8.2L865 1129 h-6.6Z" fill="#fff"/>
+<text x="869.0" y="1204" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">Lambda — status refresh</text>
+<text x="869.0" y="1218" font-size="10" fill="#5A6C74" text-anchor="middle">keeps map dots live</text>
+<defs><linearGradient id="g_ddb" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#3334B9"/><stop offset="1" stop-color="#4D72F3"/></linearGradient></defs>
+<rect x="1050" y="1040" width="78" height="78" rx="12" fill="url(#g_ddb)"/>
+<ellipse cx="1089" cy="1063" rx="17" ry="6" fill="#fff"/><path d="M1072 1063 v26c0 3.3 7.6 6 17 6s17-2.7 17-6v-26c0 3.3-7.6 6-17 6s-17-2.7-17-6Z" fill="#fff"/>
+<text x="1089.0" y="1134" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">DynamoDB</text>
+<text x="1089.0" y="1148" font-size="10" fill="#5A6C74" text-anchor="middle">SNAPSHOT#CURRENT · STATION#id</text>
+<defs><linearGradient id="g_api" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#5A30B5"/><stop offset="1" stop-color="#945DF2"/></linearGradient></defs>
+<rect x="1270" y="1040" width="78" height="78" rx="12" fill="url(#g_api)"/>
+<circle cx="1309" cy="1079" r="8.6" fill="#fff"/><path d="M1309 1055 v13 M1309 1090 v13 M1285 1079 h13 M1320 1079 h13" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/>
+<text x="1309.0" y="1134" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">API Gateway</text>
+<text x="1309.0" y="1148" font-size="10" fill="#5A6C74" text-anchor="middle">HTTP API · /stations /forecast</text>
+<defs><linearGradient id="g_cf" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#5A30B5"/><stop offset="1" stop-color="#945DF2"/></linearGradient></defs>
+<rect x="1790" y="1040" width="78" height="78" rx="12" fill="url(#g_cf)"/>
+<circle cx="1829" cy="1079" r="19" fill="none" stroke="#fff" stroke-width="3.4"/><ellipse cx="1829" cy="1079" rx="8" ry="19" fill="none" stroke="#fff" stroke-width="3"/><line x1="1810" y1="1079" x2="1848" y2="1079" stroke="#fff" stroke-width="3"/>
+<text x="1829.0" y="1134" font-size="11.5" font-weight="600" fill="#232F3E" text-anchor="middle">CloudFront</text>
+<text x="1829.0" y="1148" font-size="10" fill="#5A6C74" text-anchor="middle">global edge cache</text>
+<circle cx="539.0" cy="460.0" r="14" fill="#232F3E" stroke="#ffffff" stroke-width="2.5"/>
+<text x="539.0" y="464.6" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+<circle cx="759.0" cy="495.0" r="14" fill="#232F3E" stroke="#ffffff" stroke-width="2.5"/>
+<text x="759.0" y="499.6" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+<circle cx="979.0" cy="495.0" r="14" fill="#232F3E" stroke="#ffffff" stroke-width="2.5"/>
+<text x="979.0" y="499.6" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+<circle cx="1199.0" cy="495.0" r="14" fill="#232F3E" stroke="#ffffff" stroke-width="2.5"/>
+<text x="1199.0" y="499.6" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
+<circle cx="1419.0" cy="495.0" r="14" fill="#232F3E" stroke="#ffffff" stroke-width="2.5"/>
+<text x="1419.0" y="499.6" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">5</text>
+<circle cx="1265.0" cy="806.0" r="14" fill="#232F3E" stroke="#ffffff" stroke-width="2.5"/>
+<text x="1265.0" y="810.6" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">6</text>
+<circle cx="979.0" cy="1020.0" r="14" fill="#232F3E" stroke="#ffffff" stroke-width="2.5"/>
+<text x="979.0" y="1024.6" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">7</text>
+<circle cx="1199.0" cy="1055.0" r="14" fill="#232F3E" stroke="#ffffff" stroke-width="2.5"/>
+<text x="1199.0" y="1059.6" font-size="13" font-weight="700" fill="#ffffff" text-anchor="middle">8</text>
+</g></svg>

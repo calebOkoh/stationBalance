@@ -25,14 +25,9 @@ A web tool (out of scope for this repository, documented here only to constrain 
 
 ## 2. Architecture
 
-The deployed architecture is a single draw.io diagram: **[`docs/aws_architecture.drawio`](docs/aws_architecture.drawio)**.
+![AWS architecture for the Indego station-capacity pipeline](docs/aws_architecture.drawio.svg)
 
-It uses draw.io's official AWS shape library (`mxgraph.aws4.*`), so every node carries its real service icon and category colour, and is saved uncompressed so it diffs as plain XML in review. Open it with the draw.io desktop app, <https://app.diagrams.net>, or the VS Code *Draw.io Integration* extension.
-
-```bash
-# export a static copy if one is needed
-drawio -x -f svg -o docs/aws_architecture.svg docs/aws_architecture.drawio
-```
+Source: **[`docs/aws_architecture.drawio.svg`](docs/aws_architecture.drawio.svg)** — a hybrid file. It renders as an SVG here and carries the editable draw.io model in its `content` attribute, so opening it in the draw.io desktop app, <https://app.diagrams.net>, or the VS Code *Draw.io Integration* extension gives you the live diagram. One file, so the picture and the model cannot drift apart.
 
 Three constraints the diagram exists to make explicit:
 
