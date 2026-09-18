@@ -43,7 +43,7 @@ variable "executor_memory" {
 variable "executor_count" {
   description = "Maximum concurrent executors. Bounded by max_concurrent_vcpu: one driver plus this many executors, at 4 vCPU each, must fit inside the account quota."
   type        = number
-  default     = 3
+  default     = 2
 }
 
 variable "max_concurrent_vcpu" {

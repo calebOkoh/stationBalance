@@ -141,6 +141,16 @@ data "aws_iam_policy_document" "emr" {
       "${data.aws_s3_bucket.model.arn}/training/*",
       "${data.aws_s3_bucket.model.arn}/models/*",
       "${data.aws_s3_bucket.model.arn}/emr-logs/*",
+
+      # EMRFS writes a zero-byte marker per parent level when it creates a
+      # "directory". For parsed/trips/ that is parsed/trips_$folder$ (covered by
+      # the prefixes above) AND parsed_$folder$ at the bucket ROOT, which has no
+      # slash after the prefix and so matches none of them.
+      "${data.aws_s3_bucket.data.arn}/parsed_$folder$",
+      "${data.aws_s3_bucket.data.arn}/clean_$folder$",
+      "${data.aws_s3_bucket.model.arn}/training_$folder$",
+      "${data.aws_s3_bucket.model.arn}/models_$folder$",
+      "${data.aws_s3_bucket.model.arn}/emr-logs_$folder$",
     ]
   }
 
