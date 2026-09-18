@@ -65,9 +65,7 @@ Distributed processing is justified by:
 1. **Step 3.1** — a global sort-and-window over the entire trip history partitioned by `bike_id`. This is the genuine shuffle-heavy stage and the peak memory consumer. Note that 5.16 M rows is not, on its own, Spark-scale.
 2. **The architectural requirement of the project itself.** This is the honest primary justification and should be stated as such.
 
-~~Closure row multiplication~~ — **withdrawn.** This previously cited step 4.3/4.4 expanding permits to hourly intervals. That held for the Streets Dept layer, whose permits span months (~5,500 hours each; 8,481 permits would have expanded to ~46 M rows). Following the move to PGW as the primary closure history (§4), permits are **hour-scale** — typically one to four hours — so ~108 K permits expand to only ~430 K closure-hours, of which roughly 5% survive the 150 m station buffer. The row explosion does not occur.
-
-It is **not** justified by raw input size. Be honest about this rather than overstating the data volume — a reviewer who checks the numbers should find them conservative, not inflated.
+It is **not** justified by raw input size, and not by the closure arm: PGW permits are hour-scale, so ~108 K permits expand to ~430 K closure-hours, of which roughly 5% survive the 150 m station buffer. Be honest about this rather than overstating the data volume — a reviewer who checks the numbers should find them conservative, not inflated.
 
 ---
 
@@ -107,19 +105,19 @@ This yields **two tiers of label**:
 | **Tier 1** | `net_flow(s,t)` = `arr − dep` | **Zero.** Counted directly from trip endpoints |
 | Tier 2 | `O(s,t)`, `pct_full`, `is_empty` | Estimated — clamped cumulative ledger plus a solved initial condition |
 
-**Train on Tier-1 `net_flow`.** At inference the true current occupancy is available from `station_status`, so the model only needs to predict the *change* — which is exactly what weather, time and closures drive — and reconstruction error never enters the learned weights. Tier 2 is retained as an input feature and as the basis of the `is_empty` classifier the web tool displays.
+**Train on Tier-1 `net_flow`.** At inference the true current occupancy is available from `station_status`, so the model only needs to predict the *change* — which is exactly what weather, time and closures drive — and reconstruction error never enters the learned weights. Tier 2 is retained as an input feature and as the basis of the `is_empty` classifier the web tool displays. This also keeps the deliverables independent of Tier-2 validation, which falls outside this scope (§6).
 
 ### Pipeline 1 — Pre-Training
 
 | Phase | Does | Watch out for |
 |---|---|---|
-| **0 · Infrastructure** | Lake zones, catalog, `features.yaml`, **start the `station_status` poller** | The poller gates step 6.6 entirely and lost days are unrecoverable — deploy it first |
+| **0 · Infrastructure** | Lake zones, catalog, `features.yaml`, start the `station_status` poller | The poller feeds step 6.6 only and is not on the critical path, but start it on day one — the data cannot be backfilled |
 | **1 · Ingest** | Trip archives, station table, closures, geo layers, weather → `/raw` → `/bronze` | PGW is the only real closure history; the ArcGIS layer holds none before 2025 |
 | **2 · Conform** | Normalise schema, localise timestamps, filter, dedupe → `silver.trips`; resolve PGW addresses to geometry | DST breaks any naive local-time join; `Virtual Station` rows corrupt mass balance |
 | **3 · Labels** | Bike trajectories, rebalancing events, station-hour grid, `net_flow`, occupancy ledger | Step 3.1 must be a **single global pass** — partitioning by quarter injects a false rebalance every 3 months |
 | **4 · Features** | Reproject to EPSG:2272, filter closures to bike-relevant, expand to hours, spatial join, weather, calendar, lags | Buffering in Web Mercator inflates distances ~1.29× at Philadelphia's latitude |
 | **5 · Assembly** | Wide table, **chronological** split, fit encoders on train only, class weights | Never random-split — it leaks future weather and inflates metrics |
-| **6 · Train** | Baselines, `net_flow` regressor, `is_empty` classifier, tune, evaluate, validate ledger, attribute | Evaluate on test exactly once; attribution is a deliverable, not a by-product |
+| **6 · Train** | Baselines, `net_flow` regressor, `is_empty` classifier, tune, evaluate, attribute | Evaluate on test exactly once; attribution is a deliverable, not a by-product |
 
 ### Pipeline 2 — Inference
 
@@ -139,6 +137,12 @@ Live data is used **only** at inference. It is never a training input.
 | Clamp violation rate | Low single-digit % per station | Timing error; concentrates at stations with heavy van activity |
 | Out-of-system fleet count over time | Smooth few-% of fleet with a maintenance-shaped seasonal bump | A sawtooth means the 6h / 72h thresholds are mis-set |
 
+### Recovery test (steps 3.2 / 3.3)
+
+The ledger diagnostics above check internal consistency; they do not check that the event-emission rules are *correct*. Verify the logic directly and without external data: take a real slice of `silver.trips`, inject synthetic van moves with known station pairs and timings, run 3.1–3.3, and assert exact recovery of every injected move.
+
+This validates the emission **logic**. The 6h / 72h / 30d thresholds are **priors** and are not validated within this scope — step 6.6 would do that, and it requires a trip archive overlapping the polling window, which is not available in this timeframe. **Tier 2 therefore ships diagnostically consistent but without a numeric error bar, and is reported that way.** Tier-1 `net_flow` is counted rather than reconstructed, so training, evaluation and attribution are unaffected.
+
 ### Modelling gates
 
 - Chronological split only (5.2)
@@ -150,10 +154,10 @@ Live data is used **only** at inference. It is never a training input.
 
 ## 7. Highest-Risk Items
 
-1. **Step 0.5 — start the `station_status` poller today.** It gates step 6.6 entirely, and 6.6 is what makes the reconstruction defensible. Lost days are unrecoverable.
-2. **Step 3.1 — the global `bike_id` pass.** The one stage where a partitioning mistake produces plausible-looking but wrong output that no downstream check will obviously catch.
+1. **Step 2.6 — PGW address resolution.** PGW returns addresses as strings with no geometry, so the entire closure arm depends on a street-name normalisation and centerline range join **that does not exist yet**. It gates one of the three factors the research question is about, and street-name normalisation is open-ended work. Validate against the ~203 known-good coordinates in `LaneClosure_EUN_XY` before trusting the other ~108 K. **Timebox it.** If the centerline join does not clear that gate within budget, the closure feature degrades to permit counts per tract-hour, which need no per-address geometry.
+2. **Step 3.1 — the global `bike_id` pass.** The one stage where a partitioning mistake produces plausible-looking but wrong output that no downstream check will obviously catch. Mitigated by the recovery test in §6, which is why that test is a gate and not a nice-to-have.
 3. **Step 4.1 — CRS handling.** Buffering in the wrong projection yields silently incorrect closure features, and the model will simply learn nothing from the closure arm.
-4. **Step 2.6 — PGW address resolution.** PGW returns addresses as strings with no geometry, so the whole closure arm now depends on a street-name normalisation and centerline range join that does not exist yet. Validate it against the ~203 known-good coordinates in `LaneClosure_EUN_XY` before trusting the other ~108 K.
+4. **Step 0.5 — the `station_status` poller.** It gates nothing in this delivery, but it is ~20 lines and the data cannot be backfilled. Start it on day one so step 6.6 is possible later.
 
 ---
 
@@ -180,13 +184,14 @@ Live data is used **only** at inference. It is never a training input.
 
 ---
 
-## 9. Open Decisions
+## 9. Open Parameters
 
-| Decision | Status |
+Unresolved values that affect implementation. Everything else is decided; the reasoning and the
+rejected alternatives are recorded in `.claude/decisions.md`.
+
+| Parameter | Current position |
 |---|---|
-| Closure→station buffer distance (150 m starting point) | Open — treat as hyperparameter |
-| Gap thresholds 6h / 72h / 30d | Open — tune against polled validation set |
-| Training window start (2022 Q1 recommended) | Open |
-| Demand vs. realised-flow modelling (censoring treatment) | Open — observed flow understates demand at saturated stations; options are censored regression (Tobit) or training only on non-saturated hours |
-| PennDOT RCRS in or out of scope | **Closed — OUT.** It is live-only, so it has no training counterpart regardless of credential lead time, and the endpoint returned HTTP 500 on 2026-09-17. |
-| Compute stack (Spark/YARN/HDFS vs. managed) | **Closed — managed.** EMR Serverless on S3 with the Glue Data Catalog; see §2. |
+| Closure→station buffer distance | 150 m starting point; treat as a hyperparameter and test sensitivity |
+| Gap thresholds 6h / 72h / 30d | Ship as stated priors — no validation set exists in this timeframe (§6) |
+| Training window start | 2022 Q1 recommended — consistent schema, post-COVID regime, e-bikes present |
+| Censoring treatment | Observed flow understates demand at saturated stations. Options: censored regression (Tobit), or train only on non-saturated hours |
