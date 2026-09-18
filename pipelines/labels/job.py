@@ -34,8 +34,16 @@ def bike_trajectories(trips):
     each bike's entire history lands on one executor; without it Spark still
     produces the right answer but shuffles the full trip table per window
     operation, and this is the peak-memory stage the cluster is sized for.
+
+    The ordering is TOTAL: start_time alone is not unique -- one bike can have
+    two trips stamped at the same minute -- and under a tie lead() picks an
+    arbitrary row, so the emitted event set changes between runs of the same
+    job on the same data. That was observed: two runs differed by one reb_in
+    and the 3.10 mass balance caught it. trip_id breaks every tie, which makes
+    the label set reproducible, which is the precondition for comparing two
+    models at all.
     """
-    w = Window.partitionBy("bike_id").orderBy("start_time")
+    w = Window.partitionBy("bike_id").orderBy("start_time", "trip_id")
 
     return (
         trips.repartition("bike_id")
@@ -135,17 +143,39 @@ def fleet_events(traj, cfg, window_end):
     return entry.unionByName(exit_)
 
 
-def station_hour_grid(spark, stations, trips):
+def station_hour_grid(spark, stations, trips, cfg):
     """3.4 -- the complete grid. DO NOT SKIP.
 
     Hours with no activity are real zeros, not missing rows. Aggregating trips
     alone silently drops every quiet hour and biases the model toward busy
     periods -- which is precisely the regime the stockout question lives in.
 
-    Filtered by go-live date so a station is not scored as zero-demand for
-    years before it existed. `Virtual Station` is already gone -- phase 2 drops
-    it from the station table, not just from the trips.
+    But "no activity this hour" and "this station does not exist yet, or does
+    not exist any more" are different things, and only the first is a real zero.
+    The grid is therefore bounded at BOTH ends:
+
+      start   max(go_live_date, first hour the station is seen in a trip)
+      end     last hour the station is seen -- unless that is within
+              fleet_exit_days of the window end, in which case the station is
+              simply idle and the grid runs to the end
+
+    The end bound exists because the station table publishes `Status` but no
+    RETIREMENT DATE, so a station decommissioned in 2019 still looks eligible
+    for every hour from 2022 on. Measured: 13 stations sat at zero for all
+    39,440 hours, and the worst 20 held 39.7% of every zero-occupancy hour in
+    the dataset (.claude/decisions.md). Those rows carry `is_empty = True` by
+    construction and no feature can explain them.
+
+    Activity comes from the trips themselves, so this needs no source the
+    project does not have. The idle-vs-retired threshold is the SAME
+    `fleet_exit_days` prior step 3.3 uses to decide a bike is retired rather
+    than parked -- one concept, one config key, not a second invented number.
+
+    `Virtual Station` is already gone -- phase 2 drops it from the station
+    table, not just from the trips.
     """
+    exit_days = cfg["labels"]["fleet_exit_days"]
+
     bounds = trips.select(
         F.date_trunc("hour", F.min("start_time")).alias("t0"),
         F.date_trunc("hour", F.max("end_time")).alias("t1"),
@@ -157,9 +187,41 @@ def station_hour_grid(spark, stations, trips):
         f")) AS hour_ts"
     )
 
+    # A station is "seen" at either end of a trip, so both endpoints count.
+    seen = (
+        trips.groupBy(F.col("start_station_id").alias("station_id"))
+        .agg(F.min("start_time").alias("lo"), F.max("start_time").alias("hi"))
+        .unionByName(
+            trips.groupBy(F.col("end_station_id").alias("station_id"))
+            .agg(F.min("end_time").alias("lo"), F.max("end_time").alias("hi"))
+        )
+        .groupBy("station_id")
+        .agg(F.min("lo").alias("first_seen"), F.max("hi").alias("last_seen"))
+    )
+
+    n_stations = stations.count()
+    # INNER join: a station with no trips at all in the window is not observed,
+    # and an unobserved station is not a zero-demand station -- it is absent.
+    observed = stations.join(seen, "station_id", "inner")
+    n_observed = observed.count()
+    print(f"[3.4] {n_observed}/{n_stations} stations appear in the trip data; "
+          f"{n_stations - n_observed} never do and are dropped from the grid")
+
+    window_end = F.lit(bounds["t1"])
+    start_bound = F.greatest(
+        F.date_trunc("hour", F.col("go_live_date")),
+        F.date_trunc("hour", F.col("first_seen")),
+    )
+    # Same rule as 3.3's fleet exit: a last sighting inside the threshold means
+    # idle, not retired, so the grid runs to the end of the window.
+    end_bound = F.when(
+        F.col("last_seen") >= window_end - F.expr(f"INTERVAL {exit_days} DAYS"),
+        window_end,
+    ).otherwise(F.date_trunc("hour", F.col("last_seen")))
+
     return (
-        stations.crossJoin(F.broadcast(hours) if hours.count() < 100000 else hours)
-        .filter(F.col("hour_ts") >= F.col("go_live_date"))
+        observed.crossJoin(F.broadcast(hours) if hours.count() < 100000 else hours)
+        .filter((F.col("hour_ts") >= start_bound) & (F.col("hour_ts") <= end_bound))
         .select("station_id", "hour_ts")
     )
 
@@ -223,26 +285,77 @@ def ledger_diagnostics(labelled, events, cfg) -> None:
     """
     print("\n=== 3.10 ledger diagnostics ===")
 
-    # 1. Global mass balance. Exact BY CONSTRUCTION -- every rebalance emits one
-    #    out and one in. Any difference is a pairing bug, not a tolerance issue.
-    totals = events.groupBy("event_type").count().collect()
-    counts = {r["event_type"]: r["count"] for r in totals}
-    reb_in, reb_out = counts.get("reb_in", 0), counts.get("reb_out", 0)
-    status = "OK" if reb_in == reb_out else "FAIL"
+    # 1. Global mass balance. Rebalance events are paired BY CONSTRUCTION -- one
+    #    out and one in per move -- so the rebalance arms must match exactly.
+    #
+    #    Fleet entry and exit are deliberately UNPAIRED: a bike entering the
+    #    system is a reb_in with no reb_out anywhere, and a retirement is the
+    #    reverse. So the totals cannot be equal, and comparing them to each
+    #    other makes the check print FAIL on a healthy ledger forever. The
+    #    expected difference is entries minus exits -- the bikes that are still
+    #    in service at the end of the window -- and THAT is what is asserted.
+    totals = events.groupBy("event_type", "event_kind").count().collect()
+    by_type = {}
+    by_kind = {}
+    for r in totals:
+        by_type[r["event_type"]] = by_type.get(r["event_type"], 0) + r["count"]
+        by_kind[r["event_kind"]] = by_kind.get(r["event_kind"], 0) + r["count"]
+
+    reb_in, reb_out = by_type.get("reb_in", 0), by_type.get("reb_out", 0)
+    entries, exits = by_kind.get("fleet_entry", 0), by_kind.get("fleet_exit", 0)
+    expected = entries - exits
+    actual = reb_in - reb_out
+
+    status = "OK" if actual == expected else "FAIL"
     print(f"  mass balance   reb_in={reb_in:,} reb_out={reb_out:,}  [{status}]")
-    if reb_in != reb_out:
-        print("    Note: fleet entry/exit are deliberately unpaired, so a "
-              "difference equal to the fleet event count is expected here.")
+    print(f"    rebalance arms pair exactly; the {actual:,} difference is "
+          f"fleet_entry {entries:,} - fleet_exit {exits:,} = {expected:,}")
+    print(f"    i.e. {expected:,} bikes were still in service at the window end")
+    if actual != expected:
+        print("    !! PAIRING BUG: the rebalance arms do not match. A reb_out "
+              "was emitted without its reb_in, or vice versa.")
 
     # 2. Stockout rate. With O(s,0) set to the minimum feasible value, every
     #    station touches zero at least once by construction -- but if a large
     #    FRACTION of hours sit at zero, the ledger is drifting downward and the
     #    gap rules are emitting too many reb_out events.
-    rate = labelled.agg(
-        (100.0 * F.sum((F.col("occupancy") < 1.0).cast("int")) / F.count("*")).alias("pct")
-    ).first()["pct"]
-    status = "OK" if rate is not None and rate < 15 else "REVIEW"
+    per_station = (
+        labelled.groupBy("station_id")
+        .agg(F.count("*").alias("hours"),
+             F.sum((F.col("occupancy") < 1.0).cast("int")).alias("zero_hours"))
+        .cache()
+    )
+    totals_row = per_station.agg(
+        F.sum("hours").alias("hours"), F.sum("zero_hours").alias("zero_hours")
+    ).first()
+    rate = 100.0 * totals_row["zero_hours"] / totals_row["hours"]
+    status = "OK" if rate < 15 else "REVIEW"
     print(f"  hours at zero  {rate:.2f}%  [{status}]")
+
+    # A headline rate above the threshold means one of two very different
+    # things, and the headline alone cannot tell them apart:
+    #
+    #   CONCENTRATED -- a handful of stations sitting at zero for their whole
+    #     history. Decommissioned docks and near-dead stations do exactly this,
+    #     and it says nothing about the gap rules.
+    #   SPREAD -- every station drifting down. THAT is the failure this check
+    #     is looking for: too many reb_out events.
+    #
+    # So report the concentration, not just the rate.
+    worst = per_station.orderBy(F.desc("zero_hours")).take(20)
+    top_zero = sum(r["zero_hours"] for r in worst)
+    share = 100.0 * top_zero / totals_row["zero_hours"] if totals_row["zero_hours"] else 0.0
+    n_stations = per_station.count()
+    print(f"    worst 20 of {n_stations} stations hold {share:.1f}% of all "
+          f"zero-hours -- concentrated means dead stations, spread means drift")
+
+    dead = per_station.filter(F.col("zero_hours") == F.col("hours")).count()
+    print(f"    {dead} station(s) are at zero for their ENTIRE history")
+    for r in worst[:5]:
+        pct = 100.0 * r["zero_hours"] / r["hours"]
+        print(f"      station {r['station_id']}: {r['zero_hours']:,}/{r['hours']:,} "
+              f"hours at zero ({pct:.1f}%)")
+    per_station.unpersist()
 
     # 3. Out-of-system fleet count over time. A smooth few-% of fleet with a
     #    maintenance-shaped seasonal bump is healthy; a sawtooth means the
@@ -277,7 +390,7 @@ def main() -> int:
         fleet_events(traj, cfg, window_end)
     ).cache()
 
-    grid = station_hour_grid(spark, stations, trips)
+    grid = station_hour_grid(spark, stations, trips, cfg)
 
     # 3.5 -- reduce events onto the grid. left join + fillna(0) is what turns
     # "no rows" into "a real zero".

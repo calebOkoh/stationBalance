@@ -42,8 +42,112 @@ Two diagrams, deliberately separate, because they describe two different things:
 | **[`docs/pretrained_model.drawio`](docs/pretrained_model.drawio)** | **Built and deployed.** The batch training pipeline: download archives → process → train → register. Every input is historical. |
 | **[`docs/live_inference.drawio`](docs/live_inference.drawio)** | **Not built.** What would exist if real-time inference were added, and how live data would interact with the trained model. |
 
-Open either in the draw.io desktop app, <https://app.diagrams.net>, or the VS
+Both render inline below. GitHub does not display `.drawio` files in a README,
+so each diagram is mirrored here as Mermaid — which renders on load, diffs like
+code, and needs no hosted page. The `.drawio` files remain the detailed source:
+open either in the draw.io desktop app, <https://app.diagrams.net>, or the VS
 Code *Draw.io Integration* extension.
+
+### Built — the batch training pipeline
+
+```mermaid
+flowchart LR
+    subgraph SRC["Historical sources — downloaded once, never re-fetched"]
+        direction TB
+        S1["Indego Trip Archives<br/><i>quarterly ZIP · 5.31 M trips · 2022 Q1+</i>"]
+        S2["Indego Station Table<br/><i>CSV · station_id, go-live date</i>"]
+        S3["Open-Meteo Historical Forecast<br/><i>hourly · 4 grid points, not 354 stations</i>"]
+    end
+
+    subgraph AWS["AWS Cloud — us-east-1"]
+        direction LR
+        LAM["Lambda<br/><i>ingest · 3 tasks</i>"]
+        S3D[("Amazon S3<br/><i>raw · parsed · clean</i>")]
+        EMR["EMR Serverless<br/><i>Spark · no pre-init capacity</i>"]
+        S3M[("Amazon S3<br/><i>training splits · models</i>")]
+        SM["SageMaker<br/><i>LightGBM · Processing · ml.t3.xlarge</i>"]
+        REG["SageMaker Model Registry<br/><i>model + features.json + metrics</i>"]
+
+        subgraph SUP["Supporting"]
+            direction TB
+            GLUE["Glue Data Catalog<br/><i>hand-written DDL · no crawler</i>"]
+            ATH["Athena<br/><i>QA gates · ledger diagnostics</i>"]
+            CW["CloudWatch<br/><i>logs · budget alarm</i>"]
+        end
+    end
+
+    SRC --> LAM
+    LAM -->|"land to raw/"| S3D
+    S3D <-->|"read · write parsed / clean"| EMR
+    EMR -->|"training splits"| S3M
+    S3M -->|"9.44 M rows × 22 features"| SM
+    SM -->|"model + metrics + SHAP"| REG
+    EMR -.->|catalogs| GLUE
+    GLUE -.->|QA gates| ATH
+
+    classDef src fill:#F2F3F3,stroke:#879196,color:#232F3E
+    classDef store fill:#E8F4E4,stroke:#277116,color:#232F3E
+    classDef compute fill:#FDEBDD,stroke:#D05C17,color:#232F3E
+    classDef ml fill:#E0F5F1,stroke:#01A88D,color:#232F3E
+    classDef ops fill:#EFE7FB,stroke:#4D27AA,color:#232F3E
+
+    class S1,S2,S3 src
+    class S3D,S3M store
+    class LAM,EMR compute
+    class SM,REG ml
+    class GLUE,ATH,CW ops
+```
+
+**Nothing is on a schedule.** No EventBridge rule exists in this account, and
+`scripts/00_preflight.sh` asserts the schedule count is zero. Ordering comes
+from the numbered scripts in `scripts/`, not from an orchestrator, because
+every run is attended.
+
+### Not built — what live inference would look like
+
+```mermaid
+flowchart LR
+    REG["SageMaker Model Registry<br/><i>the ONLY link to the training pipeline</i>"]
+
+    subgraph LIVE["Live sources — read at inference time only"]
+        direction TB
+        L1["GBFS station_status<br/><i>live dock counts · supplies O(s,t₀)</i>"]
+        L2["Open-Meteo Forecast<br/><i>live · SAME variable list as training</i>"]
+    end
+
+    subgraph AWS2["AWS Cloud — NOT DEPLOYED"]
+        direction LR
+        EB["EventBridge<br/><i>hourly</i>"]
+        INF["Lambda — inference<br/><i>predict net_flow → integrate → P(empty)</i>"]
+        DDB[("DynamoDB<br/><i>precomputed cube · ~12 K rows</i>")]
+        API["API Gateway<br/><i>/stations /forecast /attribution</i>"]
+        CF["CloudFront<br/><i>global edge · 60 s TTL</i>"]
+    end
+
+    WEB["Web Tool<br/><i>out of scope · map + tendency graph</i>"]
+
+    REG -->|"artifact bundle"| INF
+    L1 -->|"O(s,t₀)"| INF
+    L2 --> INF
+    EB -->|hourly| INF
+    INF -->|"12 K predictions / refresh"| DDB
+    DDB -->|"1 read · &lt;10 ms"| API
+    API -->|"60 s edge TTL"| CF
+    CF --> WEB
+
+    classDef src fill:#F2F3F3,stroke:#879196,color:#232F3E
+    classDef notbuilt fill:#FBE9E9,stroke:#B04545,color:#232F3E,stroke-dasharray: 5 3
+    classDef ml fill:#E0F5F1,stroke:#01A88D,color:#232F3E
+
+    class L1,L2,WEB src
+    class EB,INF,DDB,API,CF notbuilt
+    class REG ml
+```
+
+**None of this exists in the account** — no DynamoDB table, no API Gateway, no
+EventBridge rule, no endpoint. The model is *not* on the request path: a
+precomputed cube is served instead, because 354 stations × 48 hours is ~17 K
+predictions that fit in one batch refresh.
 
 The split is the point. Everything that touches a live feed — GBFS
 `station_status`, the live weather forecast, DynamoDB, API Gateway, CloudFront —
@@ -62,7 +166,7 @@ Three constraints the training diagram exists to make explicit:
 | Nothing is on a schedule | Every run is attended. There is no EventBridge resource in the account, and `scripts/00_preflight.sh` asserts that |
 | The model is registered, not served | The deliverable is the bundle in the SageMaker Model Registry. No endpoint, no API, nothing warm |
 
-**Sizing and cost.** EMR Serverless at driver 4 vCPU / 14 GB and two executors at 4 vCPU / 14 GB, dynamic allocation off, `preInitializedCapacity` **0** — 12 vCPU and 42 GB, inside both the application cap and the account's 16 vCPU quota (L-D05C8A75), ~$1–2 per pipeline run. The sizing is passed explicitly in `scripts/20_run_phase.sh`; left to the image defaults, Spark requests executors past the cap and decorates every run with warnings that look like failures. SageMaker training on one `ml.m5.4xlarge`, ~$0.25 per run. At rest this is S3 storage and nothing else, well under $1/month. Every meaningful cost risk is something *left running*: a NAT Gateway ($32/mo), a managed MLflow tracking server (~$460/mo), or pre-initialised EMR capacity. None are provisioned.
+**Sizing and cost.** EMR Serverless at driver 4 vCPU / 14 GB and two executors at 4 vCPU / 14 GB, dynamic allocation off, `preInitializedCapacity` **0** — 12 vCPU and 42 GB, inside both the application cap and the account's 16 vCPU quota (L-D05C8A75), ~$1–2 per pipeline run. The sizing is passed explicitly in `scripts/20_run_phase.sh`; left to the image defaults, Spark requests executors past the cap and decorates every run with warnings that look like failures. SageMaker phase 6 on one `ml.t3.xlarge`, ~$0.60 per run. The canonical path is a Training job on one `ml.m5.4xlarge` at ~$0.25, and `scripts/30_train.sh` still is that path — but every `ml.* for training job usage` quota in this account is **0**, in every region, so the executed run is a **Processing** job via `scripts/31_train_processing.sh` (same service, same role, same image, same unmodified `train.py`; 4 burstable vCPU instead of 16, so hours instead of ~20 min). See `.claude/decisions.md`. At rest this is S3 storage and nothing else, well under $1/month. Every meaningful cost risk is something *left running*: a NAT Gateway ($32/mo), a managed MLflow tracking server (~$460/mo), or pre-initialised EMR capacity. None are provisioned.
 
 ---
 
@@ -81,11 +185,11 @@ run is right.
 | Trip records after phase 2 | **5,096,494** (210,641 dropped, 3.97% — window, duration bounds, pseudo-station) |
 | Trip *events* (arrivals + departures) | **~10.2 M** |
 | Stations | **367** (368 published, minus `Virtual Station`) |
-| Hours in window | **41,323** |
-| Station-hour modelling grid | **~15.2 M rows** before the go-live filter (367 × 41,323) |
+| Hours in window | **39,440** (2022-01-01 → 2026-07-02, from the trip bounds; the weather pull covers 41,323) |
+| Station-hour modelling grid | **10,818,141 rows** — 367 × 39,440 is 14.5 M before the go-live filter removes the years a station did not yet exist |
 | Total storage footprint | **~3–5 GB** |
 
-This is a **modest** volume. At ~22 features the grid is roughly 2–3 GB in
+This is a **modest** volume. At ~22 features the grid is roughly 2 GB in
 memory, so the modelling table still fits on a single machine — the phase-6
 instance has 64 GB.
 
@@ -245,7 +349,9 @@ This validates the emission **logic**. The 6h / 72h / 30d thresholds are **prior
 │   ├── assembly/                       # Phase 5
 │   └── training/                       # Phase 6
 ├── scripts/                            # The attended running order, numbered
-│   └── 25_run_gate.sh                  # The phase-3 recovery GATE, on the cluster
+│   ├── 25_run_gate.sh                  # The phase-3 recovery GATE, on the cluster
+│   ├── 30_train.sh                     # Phase 6 — SageMaker Training (canonical)
+│   └── 31_train_processing.sh          # Phase 6 — SageMaker Processing (quota fallback)
 └── tests/
     ├── test_recovery.py                # The 3.2/3.3 recovery GATE (needs Spark)
     └── test_calendarfeat.py            # Shared calendar features
@@ -277,6 +383,22 @@ scripts/20_run_phase.sh assembly         # wide table, chronological split
 scripts/30_train.sh                      # train, evaluate, attribute
 scripts/40_publish_model.sh <job-name>   # register the model
 ```
+
+`30_train.sh` submits a SageMaker **Training** job on `ml.m5.4xlarge`. If the
+account's training-job quota is 0 — which it is here, for every instance type
+and every region, pending an AWS Support case — it fails immediately with
+`ResourceLimitExceeded` and nothing is charged. Use the Processing-job path
+instead:
+
+```bash
+scripts/31_train_processing.sh           # same run, on the quota that exists
+```
+
+Same service, same role, same image, same unmodified `train.py`, same
+`model.tar.gz` at the same S3 path, so `40_publish_model.sh` takes either one
+without knowing which produced it. It is slower — 4 burstable vCPU rather than
+16 — and it is a fallback, not a replacement. Rationale in
+`.claude/decisions.md`.
 
 Roughly 2–3 hours end to end, most of it unattended. `scripts/run_tests.sh`
 runs the unit tests; the recovery gate runs on the cluster via

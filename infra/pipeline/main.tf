@@ -273,7 +273,14 @@ data "aws_iam_policy_document" "sagemaker" {
     condition {
       test     = "StringEquals"
       variable = "cloudwatch:namespace"
-      values   = ["/aws/sagemaker/TrainingJobs"]
+      # ProcessingJobs as well as TrainingJobs: phase 6 runs as a Processing
+      # job while the account's training-job quota is zero (decisions.md).
+      # A namespace the role cannot write is a denied PutMetricData on every
+      # emit -- noise in the log that looks like a failure and is not.
+      values = [
+        "/aws/sagemaker/TrainingJobs",
+        "/aws/sagemaker/ProcessingJobs",
+      ]
     }
   }
 

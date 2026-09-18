@@ -48,7 +48,9 @@ aws sagemaker create-training-job \
   --output-data-config "{\"S3OutputPath\": \"s3://$MODEL_BUCKET/models/\"}" \
   --resource-config "{\"InstanceType\": \"$INSTANCE\", \"InstanceCount\": 1, \"VolumeSizeInGB\": 50}" \
   --stopping-condition "{\"MaxRuntimeInSeconds\": 7200}" \
-  --tags "Key=service,Value=station-balance Key=step,Value=training" \
+  `# Two separate shorthand arguments. Quoting them as one string makes the`  \
+  `# CLI read a single tag with two Value keys and reject it.`                 \
+  --tags Key=service,Value=station-balance Key=step,Value=training \
   --output text --query 'TrainingJobArn'
 
 echo "==> waiting"
