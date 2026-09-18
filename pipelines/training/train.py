@@ -5,18 +5,20 @@ Runs as a SageMaker script-mode job on one ml.m5.4xlarge (~$0.25/run).
 Trains both targets:
   * net_flow regressor   -- Tier 1, the real target. Predicting CHANGE rather
     than level keeps reconstruction error out of the learned weights.
-  * is_empty classifier  -- calibrated, because the web tool displays a
-    probability, not a point estimate.
+  * is_empty classifier  -- a calibrated probability rather than a point
+    estimate, so a downstream consumer can threshold it themselves.
 
-Step 6.6 (validating the ledger against polled station_status) is DEFERRED past
-delivery: it needs a trip archive overlapping the polling window, and Indego
-publishes quarterly, so the overlap does not exist yet (.claude/decisions.md).
-Tier 2 therefore ships diagnostically consistent but without a numeric error
-bar, and metrics.json says so explicitly rather than omitting it.
+The Tier-2 occupancy labels are NOT externally validated. Checking them would
+need a window of recorded live dock counts to compare against, and this project
+records none -- it reads historical archives only. Tier 2 therefore ships
+diagnostically consistent but without a numeric error bar, and metrics.json
+says so explicitly rather than omitting it.
 
-Exports the bundle step 6.8 specifies, in the exact shape the inference Lambda
-opens: model text, features.json, serving_context.json, metrics.json,
-attribution.json.
+Exports the bundle step 6.8 specifies: model text, features.json, metrics.json,
+attribution.json. The bundle is the deliverable -- it is registered in the
+SageMaker Model Registry and nothing serves it. A future inference path would
+load exactly these; that path is drawn in docs/live_inference.drawio and is not
+built.
 """
 
 from __future__ import annotations
@@ -228,17 +230,6 @@ def main() -> int:
                    num_iteration=clf.best_iteration)
     shutil.copy(SOURCE_DIR / "features.json", MODEL_DIR / "features.json")
 
-    context_path = TRAIN_DIR.parent / "serving_context" / "serving_context.json"
-    if context_path.exists():
-        shutil.copy(context_path, MODEL_DIR / "serving_context.json")
-    else:
-        # Phase 5 writes this; without it the inference Lambda cannot build a
-        # feature vector, so failing here is far better than publishing a
-        # bundle that errors hourly in production.
-        raise SystemExit(
-            f"serving_context.json not found at {context_path} -- re-run "
-            "scripts/20_run_phase.sh assembly"
-        )
 
     metrics = {
         "trained_at": pd.Timestamp.utcnow().isoformat(),
@@ -252,12 +243,16 @@ def main() -> int:
         "gates": {"beats_baseline_6_1": bool(beats_baseline)},
         "caveats": [
             "Tier-2 occupancy is diagnostically consistent but NOT externally "
-            "validated: step 6.6 needs a trip archive overlapping the "
-            "station_status polling window, which does not exist yet. It "
-            "therefore ships without a numeric error bar.",
+            "validated: no recorded dock counts exist to check it against. It "
+            "ships without a numeric error bar.",
             "Gap thresholds 6h / 72h / 30d are stated priors, not findings.",
-            "net_flow_same_hour_last_week is substituted at serve time by the "
-            "(station, hour, weekday) climatology in serving_context.json.",
+            "The closure arm is ABSENT, not zero: PGW publishes closures as "
+            "text addresses with no coordinates and the resolver does not "
+            "exist. This model measures weather and time only.",
+            "Occupancy level is a lower bound -- O(s,0) is the minimum value "
+            "keeping occupancy non-negative, since no historical capacity is "
+            "published. The series shape, which the features predict, is "
+            "unaffected.",
         ],
     }
     (MODEL_DIR / "metrics.json").write_text(json.dumps(metrics, indent=2))

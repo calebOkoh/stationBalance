@@ -63,14 +63,14 @@ variable "log_retention_days" {
   default = 30
 }
 
-variable "raw_bucket_name" {
-  description = "Override the raw-zone bucket name. Defaults to the lake layer's convention; set it only when pointing this layer at a lake that was named differently."
+variable "data_bucket_name" {
+  description = "Override the data bucket name. Defaults to the storage layer's convention."
   type        = string
   default     = null
 }
 
-variable "gold_bucket_name" {
-  description = "Override the gold bucket name. Same reasoning as raw_bucket_name."
+variable "model_bucket_name" {
+  description = "Override the model bucket name. Same reasoning as data_bucket_name."
   type        = string
   default     = null
 }

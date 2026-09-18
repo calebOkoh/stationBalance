@@ -1,9 +1,7 @@
 """Phase 5 -- Assembly and Split. pipelines.md steps 5.1-5.5.
 
-Produces the frozen train/val/test splits the training job reads, and the
-serving context the inference Lambda needs. Both come out of the SAME pass, so
-a feature computed for training and its serve-time counterpart are produced by
-one piece of code rather than two that agree today.
+Produces the frozen train/val/test splits the training job reads, plus the
+baseline table those splits are judged against.
 """
 
 from __future__ import annotations
@@ -58,54 +56,26 @@ def class_weight(train, cfg) -> float:
     return weight
 
 
-def serving_context(train, stations, cfg) -> dict:
-    """The serve-time substitutes for features that need history.
+def baseline_table(train) -> dict:
+    """The (station, hour, weekday) mean net_flow — step 6.1's baseline.
 
-    Exported HERE, from the training data, by the same code that built the
-    training rows. The alternative -- the inference Lambda deriving them
-    independently -- is the classic train/serve skew this whole phase exists to
-    prevent.
-
-    `climatology` is the (station, hour, weekday) mean net_flow, which is also
-    the 6.1 baseline table. It stands in at serve time for
-    net_flow_same_hour_last_week, whose true value needs a week of reconstructed
-    ledger that only exists after a Phase 3 run.
+    Exported as an artifact rather than recomputed at training time because it
+    is also what any future inference path would need to stand in for the
+    week-lag feature, and because a baseline the model is judged against should
+    be a frozen number, not something recomputed per experiment.
     """
-    clim = (
+    rows = (
         train.groupBy("station_id",
                       F.hour("hour_ts").alias("h"),
                       F.dayofweek("hour_ts").alias("dow"))
         .agg(F.avg("net_flow").alias("mean_net_flow"))
         .collect()
     )
-    # Spark's dayofweek is 1=Sunday; Python's weekday() is 0=Monday. Converting
-    # here rather than at read time keeps the key format identical on both
-    # sides of the contract.
-    climatology = {
-        f"{r['station_id']}|{r['h']}|{(r['dow'] + 5) % 7}": round(r["mean_net_flow"], 4)
-        for r in clim
-    }
-
-    rolling = {
-        str(r["station_id"]): round(r["m"], 4)
-        for r in train.groupBy("station_id").agg(F.avg("net_flow").alias("m")).collect()
-    }
-
-    static = {
-        str(r["station_id"]): {
-            "capacity": r["capacity_gbfs"],
-            "lat": r["lat"],
-            "lon": r["lon"],
-            "bike_lane_density": r["bike_lane_density"],
-            "dist_to_centroid_m": r["dist_to_centroid_m"],
-        }
-        for r in stations.collect()
-    }
-
+    # Spark's dayofweek is 1=Sunday; Python's weekday() is 0=Monday. Converted
+    # here so the key format matches calendarfeat's convention.
     return {
-        "station_static": static,
-        "climatology": climatology,
-        "net_flow_rolling_7d_mean": rolling,
+        f"{r['station_id']}|{r['h']}|{(r['dow'] + 5) % 7}": round(r["mean_net_flow"], 4)
+        for r in rows
     }
 
 
@@ -113,15 +83,14 @@ def main() -> int:
     args = parse_args(__doc__)
     spark = spark_session("assembly")
     cfg = load_features(spark, args.features)
-    zones = Zones(args.raw_bucket, args.gold_bucket)
+    zones = Zones(args.data_bucket, args.model_bucket)
 
-    df = spark.read.parquet(f"{zones.silver}/station_hour_features/")
-    stations = spark.read.parquet(f"{zones.bronze}/stations/")
+    df = spark.read.parquet(f"{zones.clean}/station_hour_features/")
 
     # 5.1 -- the single wide table the training job reads.
-    (df.write.mode("overwrite").partitionBy("year", "month")
-       .parquet(f"{zones.gold}/station_hour_features/"))
-    spark.sql(f"MSCK REPAIR TABLE `{args.glue_database}`.gold_station_hour_features")
+    (df.write.mode("overwrite").partitionBy("part_year", "part_month")
+       .parquet(f"{zones.training}/station_hour_features/"))
+    spark.sql(f"MSCK REPAIR TABLE `{args.glue_database}`.training_station_hour_features")
 
     train, val, test = chronological_split(df, cfg)
 
@@ -129,7 +98,7 @@ def main() -> int:
     # experiments. Row counts and date ranges are recorded with them.
     manifest = {}
     for name, part in (("train", train), ("val", val), ("test", test)):
-        (part.write.mode("overwrite").parquet(f"{zones.gold}/{name}/"))
+        (part.write.mode("overwrite").parquet(f"{zones.training}/{name}/"))
         bounds = part.agg(F.min("hour_ts"), F.max("hour_ts")).first()
         manifest[name] = {
             "rows": part.count(),
@@ -144,13 +113,12 @@ def main() -> int:
     # step says so" would leak test statistics for no benefit.
     manifest["class_weight_is_empty"] = class_weight(train, cfg)
 
-    context = serving_context(train, stations, cfg)
     sc = spark.sparkContext
-    sc.parallelize([json.dumps(context)], 1).saveAsTextFile(
-        f"{zones.gold}/serving_context/"
+    sc.parallelize([json.dumps(baseline_table(train))], 1).saveAsTextFile(
+        f"{zones.training}/baseline/"
     )
     sc.parallelize([json.dumps(manifest, indent=2)], 1).saveAsTextFile(
-        f"{zones.gold}/split_manifest/"
+        f"{zones.training}/split_manifest/"
     )
 
     print(f"[assembly] done. {manifest}")

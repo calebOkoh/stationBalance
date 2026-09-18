@@ -11,7 +11,7 @@ by a van, and a reb_out/reb_in pair is emitted.
 
 Two tiers come out of this:
   Tier 1  net_flow = arr - dep     counted, zero error. THE training target.
-  Tier 2  O, pct_full, is_empty    estimated from a clamped cumulative ledger.
+  Tier 2  O, pct_full, is_empty    estimated from the cumulative ledger.
 
 Step 3.1 MUST be a single global pass across all quarters. Partitioning by
 quarter breaks bike_id continuity and injects a false rebalance every 3 months.
@@ -159,23 +159,32 @@ def station_hour_grid(spark, stations, trips):
     return (
         stations.crossJoin(F.broadcast(hours) if hours.count() < 100000 else hours)
         .filter(F.col("hour_ts") >= F.col("go_live_date"))
-        .select("station_id", "hour_ts", "capacity_gbfs")
+        .select("station_id", "hour_ts")
     )
 
 
 def solve_initial_occupancy(flows, cfg):
-    """3.8 / 3.9 -- solve O(s,0), then integrate and clamp.
+    """3.8 / 3.9 -- solve O(s,0), then integrate.
 
-    O(s,0) is ONE unknown scalar per station. The physical constraint
-    0 <= O(s,t) <= capacity(s) pins it with no external data: over the
-    cumulative delta series C(t), feasibility requires
+    O(s,0) is ONE unknown scalar per station. The original design pinned it
+    with the constraint 0 <= O <= capacity, taking the midpoint of the feasible
+    interval -- but that needs a published capacity per station, and the only
+    source for one was a live feed. This project reads historical archives
+    only, and Indego publishes no historical capacity.
 
-        -min(C) <= O(s,0) <= capacity - max(C)
+    So the lower constraint alone is used: O(s,0) = -min(cumulative delta),
+    the smallest starting occupancy that keeps O(s,t) >= 0 for every hour. That
+    is well defined, needs nothing external, and has no free parameter. Its
+    cost is that the level is a lower bound rather than a centred estimate --
+    the SHAPE of the series, which is what the features predict, is unchanged.
 
-    and the midpoint of that interval is the least-committal choice. An empty
-    interval means the reconstruction is inconsistent for that station -- it is
-    FLAGGED rather than silently clamped, because a station that cannot be
-    solved is evidence about the emission rules, not a rounding problem.
+    Capacity is then derived in 3.7 as the rolling maximum of the resulting
+    occupancy, which is self-consistent by construction: a station is "full"
+    exactly when it reaches the most bikes it has recently held.
+
+    Tier 2 was already shipping without a numeric error bar -- step 6.6 is
+    deferred past delivery -- so this trades one unvalidated estimate for
+    another that at least has no hidden dependency.
     """
     w = Window.partitionBy("station_id").orderBy("hour_ts").rowsBetween(
         Window.unboundedPreceding, Window.currentRow
@@ -187,32 +196,21 @@ def solve_initial_occupancy(flows, cfg):
     per_station = flows.groupBy("station_id").agg(
         F.min("cum_delta").alias("min_cum"),
         F.max("cum_delta").alias("max_cum"),
-        F.first("capacity_gbfs").alias("capacity_gbfs"),
-    ).withColumn("lower", -F.col("min_cum")) \
-     .withColumn("upper", F.col("capacity_gbfs") - F.col("max_cum")) \
-     .withColumn("feasible", F.col("lower") <= F.col("upper")) \
-     .withColumn(
-         "o_initial",
-         F.when(F.col("feasible"), (F.col("lower") + F.col("upper")) / 2.0)
-          # Infeasible: fall back to the midpoint of the dock, which at least
-          # keeps the series inside [0, capacity] once clamped.
-          .otherwise(F.col("capacity_gbfs") / 2.0),
-     )
+    ).withColumn("o_initial", -F.col("min_cum"))
 
-    infeasible = per_station.filter(~F.col("feasible")).count()
-    total = per_station.count()
-    print(f"[3.8] initial occupancy solved for {total - infeasible}/{total} stations; "
-          f"{infeasible} infeasible (flagged, re-anchor at next quarter boundary)")
+    stats = per_station.agg(
+        F.count("*").alias("n"),
+        F.avg("o_initial").alias("mean_o0"),
+        F.max(F.col("max_cum") - F.col("min_cum")).alias("max_swing"),
+    ).first()
+    print(f"[3.8] solved O(s,0) for {stats['n']} stations; "
+          f"mean {stats['mean_o0']:.1f} bikes, largest swing {stats['max_swing']}")
 
     return (
-        flows.join(per_station.select("station_id", "o_initial", "feasible"), "station_id")
-        .withColumn("occupancy_raw", F.col("o_initial") + F.col("cum_delta"))
-        .withColumn(
-            "occupancy",
-            F.least(F.greatest(F.col("occupancy_raw"), F.lit(0.0)),
-                    F.col("capacity_gbfs").cast("double")),
-        )
-        .withColumn("clamped", F.col("occupancy") != F.col("occupancy_raw"))
+        flows.join(per_station.select("station_id", "o_initial"), "station_id")
+        # Non-negative by construction: o_initial is exactly -min(cum_delta),
+        # so the series touches zero at its minimum and never goes below.
+        .withColumn("occupancy", F.col("o_initial") + F.col("cum_delta"))
     )
 
 
@@ -235,14 +233,15 @@ def ledger_diagnostics(labelled, events, cfg) -> None:
         print("    Note: fleet entry/exit are deliberately unpaired, so a "
               "difference equal to the fleet event count is expected here.")
 
-    # 2. Clamp violation rate. Low single-digit % per station is normal and
-    #    concentrates at stations with heavy van activity; a high rate is a
-    #    timing error in the gap rules.
-    clamp = labelled.agg(
-        (100.0 * F.sum(F.col("clamped").cast("int")) / F.count("*")).alias("pct")
+    # 2. Stockout rate. With O(s,0) set to the minimum feasible value, every
+    #    station touches zero at least once by construction -- but if a large
+    #    FRACTION of hours sit at zero, the ledger is drifting downward and the
+    #    gap rules are emitting too many reb_out events.
+    rate = labelled.agg(
+        (100.0 * F.sum((F.col("occupancy") < 1.0).cast("int")) / F.count("*")).alias("pct")
     ).first()["pct"]
-    status = "OK" if clamp is not None and clamp < 10 else "REVIEW"
-    print(f"  clamp rate     {clamp:.2f}%  [{status}]")
+    status = "OK" if rate is not None and rate < 15 else "REVIEW"
+    print(f"  hours at zero  {rate:.2f}%  [{status}]")
 
     # 3. Out-of-system fleet count over time. A smooth few-% of fleet with a
     #    maintenance-shaped seasonal bump is healthy; a sawtooth means the
@@ -261,10 +260,10 @@ def main() -> int:
     args = parse_args(__doc__)
     spark = spark_session("labels")
     cfg = load_features(spark, args.features)
-    zones = Zones(args.raw_bucket, args.gold_bucket)
+    zones = Zones(args.data_bucket, args.model_bucket)
 
-    trips = spark.read.parquet(f"{zones.silver}/trips/")
-    stations = spark.read.parquet(f"{zones.bronze}/stations/")
+    trips = spark.read.parquet(f"{zones.clean}/trips/")
+    stations = spark.read.parquet(f"{zones.parsed}/stations/")
 
     window_end = trips.agg(F.max("end_time")).first()[0]
     print(f"[labels] window ends {window_end}")
@@ -308,10 +307,9 @@ def main() -> int:
 
     labelled = solve_initial_occupancy(flows, cfg)
 
-    # 3.7 -- capacity. Historical capacity is not published and stations have
-    # been resized, so a fixed current capacity misstates pct_full for earlier
-    # periods. The rolling max of reconstructed occupancy tracks the resize;
-    # GBFS capacity is the cross-check and the floor.
+    # 3.7 -- capacity, derived from the reconstruction itself. Historical
+    # capacity is not published and stations have been resized, so there is no
+    # external number to use. The rolling max tracks a resize.
     days = cfg["labels"]["capacity_rolling_days"]
     w_cap = (
         Window.partitionBy("station_id")
@@ -320,9 +318,11 @@ def main() -> int:
     )
     labelled = (
         labelled
-        .withColumn("capacity_rolling", F.max("occupancy").over(w_cap))
-        .withColumn("capacity",
-                    F.greatest(F.col("capacity_rolling"), F.col("capacity_gbfs")))
+        # Historical capacity is not published and stations have been resized,
+        # so a single fixed number would misstate pct_full for earlier periods.
+        # The rolling max tracks a resize; the floor of 1 keeps the division
+        # below defined for a station that never held a bike.
+        .withColumn("capacity", F.greatest(F.max("occupancy").over(w_cap), F.lit(1.0)))
         # 3.9 -- TIER-2 LABELS. Estimated, and reported as such.
         .withColumn("pct_full", F.col("occupancy") / F.col("capacity"))
         .withColumn("is_empty", F.col("occupancy") < 1.0)
@@ -335,14 +335,19 @@ def main() -> int:
         labelled.select(
             "station_id", "hour_ts", "arr", "dep", "reb_in", "reb_out",
             "net_flow", "occupancy", "capacity", "pct_full",
-            "is_empty", "is_full", "feasible", "clamped",
+            "is_empty", "is_full",
         )
-        .withColumn("year", F.year("hour_ts"))
-        .withColumn("month", F.month("hour_ts"))
+        # Named part_* so the partition column cannot shadow the `month`
+        # FEATURE that calendarfeat derives. Same value, different job: one is
+        # a storage layout, the other is a model input, and letting a write
+        # silently overwrite the second is how a feature quietly becomes an
+        # int partition key.
+        .withColumn("part_year", F.year("hour_ts"))
+        .withColumn("part_month", F.month("hour_ts"))
     )
 
-    (out.write.mode("overwrite").partitionBy("year", "month")
-        .parquet(f"{zones.silver}/station_hour_labels/"))
+    (out.write.mode("overwrite").partitionBy("part_year", "part_month")
+        .parquet(f"{zones.clean}/station_hour_labels/"))
 
     print(f"[labels] wrote {out.count():,} station-hours")
     return 0

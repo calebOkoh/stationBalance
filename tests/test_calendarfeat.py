@@ -3,7 +3,7 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src" / "lambdas" / "common"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "pipelines"))
 
 import calendarfeat as cf  # noqa: E402
 

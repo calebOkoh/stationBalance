@@ -3,12 +3,12 @@ set -euo pipefail
 
 # Deploys the batch compute: the EMR Serverless application for phases 2-5, the
 # SageMaker role for phase 6, and the model package group that is the handoff
-# to Pipeline 2.
+# the trained model is registered into.
 #
 # Nothing here runs on a schedule. Pipeline 1 is attended -- ordering comes
 # from the numbered scripts in scripts/, not from an orchestrator.
 #
-# Requires deploy-lake.sh to have run.
+# Requires deploy-storage.sh to have run.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -27,7 +27,7 @@ terraform -chdir="$LAYER_DIR" apply -input=false "$@"
 
 echo
 echo "Pipeline compute ready. Phases are run by hand, in order:"
-echo "  scripts/10_ingest.sh          phase 1   (Lambda)"
-echo "  scripts/20_run_phase.sh conform|labels|features|assembly   (EMR Serverless)"
-echo "  scripts/30_train.sh           phase 6   (SageMaker)"
-echo "  scripts/40_publish_model.sh   step 6.8  (bundle -> s3, enables Pipeline 2)"
+echo "  scripts/10_ingest.sh          download the archives  (Lambda)"
+echo "  scripts/20_run_phase.sh land|conform|labels|features|assembly   (EMR Serverless)"
+echo "  scripts/30_train.sh           phase 6                (SageMaker)"
+echo "  scripts/40_publish_model.sh   step 6.8, register the model"

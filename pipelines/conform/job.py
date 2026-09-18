@@ -1,22 +1,19 @@
-"""Phase 2 -- Conform (Bronze -> Silver). pipelines.md steps 1.9 and 2.1-2.5.
+"""Phase 2 -- Conform. pipelines.md steps 2.1-2.5.
 
-Reads the raw trip archives, normalises 18 quarters of drifting schema onto one
-shape, localises timestamps, filters, deduplicates, and writes silver.trips.
+Reads parsed/trips/, normalises 18 quarters of drifting schema onto
+one shape, localises timestamps, filters, deduplicates, and writes clean/trips/.
 
-Step 2.6 (resolving PGW addresses to geometry) is the project's highest-risk
-item and is NOT implemented here -- it needs a street-name normaliser and a
-centerline range join that do not exist yet. The closure arm degrades to permit
-counts per tract-hour if it does not clear its timebox (.claude/decisions.md).
-That gap is explicit rather than silently producing an empty closure table.
+Step 2.6 (resolving PGW closure addresses to geometry) is gone along with the
+rest of the closure arm: PGW publishes addresses as bare text with no
+coordinates, and the street-name normaliser that would fix that does not exist.
+The project measures weather and time, not closures.
 """
 
 from __future__ import annotations
 
 import sys
-import zipfile
 
 from pyspark.sql import functions as F
-from pyspark.sql import types as T
 
 from lib import Zones, load_features, log_counts, parse_args, spark_session
 
@@ -36,20 +33,6 @@ COLUMN_ALIASES = {
     "passholder_type": ["passholder_type", "passholdertype", "Passholder Type"],
 }
 
-# The archives are zipped CSVs. Spark cannot read inside a zip, so the raw
-# objects are expanded once into /bronze rather than being re-expanded by every
-# later phase.
-TRIP_SCHEMA = T.StructType([
-    T.StructField("trip_id", T.StringType()),
-    T.StructField("duration", T.StringType()),
-    T.StructField("start_time", T.StringType()),
-    T.StructField("end_time", T.StringType()),
-    T.StructField("start_station", T.StringType()),
-    T.StructField("end_station", T.StringType()),
-    T.StructField("bike_id", T.StringType()),
-    T.StructField("bike_type", T.StringType()),
-    T.StructField("passholder_type", T.StringType()),
-])
 
 
 def resolve_columns(df):
@@ -83,51 +66,13 @@ def resolve_columns(df):
     return df.select(*selected)
 
 
-def expand_archives(spark, zones) -> None:
-    """1.9 -- land the zipped CSVs as Bronze Parquet.
-
-    Done on the driver with the stdlib zipfile module: 18 archives at ~6 MB
-    each is a sequential read, and distributing it would mean a custom input
-    format for no gain.
-    """
-    import boto3
-
-    s3 = boto3.client("s3")
-    bucket = zones.raw.split("/")[2]
-    pages = s3.get_paginator("list_objects_v2").paginate(
-        Bucket=bucket, Prefix="raw/trips/"
-    )
-
-    keys = [o["Key"] for page in pages for o in page.get("Contents", [])
-            if o["Key"].endswith(".zip")]
-    if not keys:
-        raise SystemExit("no trip archives in /raw/trips/ -- run scripts/10_ingest.sh")
-
-    print(f"[conform] expanding {len(keys)} archives")
-    for key in sorted(keys):
-        import io
-        body = s3.get_object(Bucket=bucket, Key=key)["Body"].read()
-        with zipfile.ZipFile(io.BytesIO(body)) as zf:
-            for member in zf.namelist():
-                if not member.lower().endswith(".csv"):
-                    continue
-                out_key = key.replace("raw/trips/", "bronze/trips/").replace(
-                    ".zip", f"/{member.rsplit('/', 1)[-1]}"
-                )
-                s3.put_object(Bucket=bucket, Key=out_key, Body=zf.read(member))
-                print(f"  {key} -> {out_key}")
-
-
 def main() -> int:
     args = parse_args(__doc__)
     spark = spark_session("conform")
     cfg = load_features(spark, args.features)
-    zones = Zones(args.raw_bucket, args.gold_bucket)
+    zones = Zones(args.data_bucket, args.model_bucket)
 
-    expand_archives(spark, zones)
-
-    raw = spark.read.option("header", True).csv(f"{zones.bronze}/trips/*/*/*.csv")
-    df = resolve_columns(raw)
+    df = resolve_columns(spark.read.parquet(f"{zones.parsed}/trips/"))
     before = df.count()
 
     # 2.2 -- parse and localise. The session timezone is already America/New_York
@@ -182,13 +127,13 @@ def main() -> int:
     (out.write
         .mode("overwrite")
         .partitionBy("year", "month")
-        .parquet(f"{zones.silver}/trips/"))
+        .parquet(f"{zones.clean}/trips/"))
 
     # Register partitions so Athena can run the QA gates without anyone
     # writing paths by hand. The table DDL itself is Terraform-managed.
-    spark.sql(f"MSCK REPAIR TABLE `{args.glue_database}`.silver_trips")
+    spark.sql(f"MSCK REPAIR TABLE `{args.glue_database}`.clean_trips")
 
-    print(f"[conform] wrote silver.trips")
+    print("[conform] wrote clean/trips/")
     return 0
 
 

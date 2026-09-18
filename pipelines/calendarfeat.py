@@ -1,16 +1,16 @@
-"""Calendar features -- pipelines.md step 4.6, shared by BOTH pipelines.
+"""Calendar features -- pipelines.md step 4.6.
 
-The training path (Phase 4, running on EMR Serverless) and the inference path
-(Pipeline 2, running in a Lambda) import this same module. That is a
-requirement, not a convenience: "Calendar features come from shared code with
-4.6" (README section 5). Two implementations of "is this a holiday" drift, and
-the drift is invisible offline.
+Used by phase 4, and deliberately kept as a standalone module with no Spark
+import so that any future inference path can import THIS FILE rather than
+reimplement it. "Calendar features come from shared code with 4.6" (README
+section 5) -- two implementations of "is this a holiday" drift, and the drift
+is invisible offline. That inference path is drawn in
+docs/live_inference.drawio and is not built.
 
 US federal holidays are computed here rather than taken from the `holidays`
-package for the same reason. The package is not in the EMR Serverless image and
-not in the Lambda runtime, so using it would mean two installs that can pin
-different versions -- reintroducing exactly the skew this module exists to
-prevent. The federal rules are fixed law and fit in fifty lines.
+package because the package is not in the EMR Serverless image, and adding it
+means pinning a version in two places later. The federal rules are fixed law
+and fit in fifty lines.
 
 Hour and weekday are encoded CYCLICALLY. Without it hour 23 is maximally
 distant from hour 0, which is the opposite of the truth and costs the temporal

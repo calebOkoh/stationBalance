@@ -14,7 +14,7 @@ output "sagemaker_role_arn" {
 }
 
 output "model_package_group" {
-  description = "SageMaker Model Registry group — the Pipeline 1 to Pipeline 2 handoff"
+  description = "SageMaker Model Registry group — where the trained model is registered"
   value       = aws_sagemaker_model_package_group.registry.model_package_group_name
 }
 

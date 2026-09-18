@@ -13,7 +13,7 @@
 # a job three phases later.
 ###############################################################################
 resource "aws_s3_object" "features_json" {
-  bucket       = aws_s3_bucket.gold.id
+  bucket       = aws_s3_bucket.model.id
   key          = "code/features.json"
   content      = jsonencode(yamldecode(file("${path.module}/../../features.yaml")))
   content_type = "application/json"
@@ -29,7 +29,7 @@ resource "aws_s3_object" "features_json" {
 # The YAML itself is published alongside it, unparsed. It carries the comments
 # -- every "why" in the contract lives there and none of it survives yamldecode.
 resource "aws_s3_object" "features_yaml" {
-  bucket       = aws_s3_bucket.gold.id
+  bucket       = aws_s3_bucket.model.id
   key          = "code/features.yaml"
   source       = "${path.module}/../../features.yaml"
   etag         = filemd5("${path.module}/../../features.yaml")

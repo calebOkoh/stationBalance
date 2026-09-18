@@ -1,16 +1,16 @@
-output "raw_bucket" {
-  description = "Landing zone bucket: /raw (immutable), /bronze, /silver"
-  value       = aws_s3_bucket.raw.id
+output "data_bucket" {
+  description = "Downloaded archives and everything derived from them: raw/, parsed/, clean/"
+  value       = aws_s3_bucket.data.id
 }
 
-output "gold_bucket" {
-  description = "Modelling bucket: /gold, /models, /code, /athena-results, /emr-logs"
-  value       = aws_s3_bucket.gold.id
+output "model_bucket" {
+  description = "Training splits and model artifacts: training/, models/, code/, athena-results/, emr-logs/"
+  value       = aws_s3_bucket.model.id
 }
 
 output "glue_database" {
   description = "Glue catalog database name"
-  value       = aws_glue_catalog_database.lake.name
+  value       = aws_glue_catalog_database.catalog.name
 }
 
 output "athena_workgroup" {
@@ -25,5 +25,5 @@ output "emr_log_group" {
 
 output "features_json_uri" {
   description = "features.yaml rendered to JSON — what the Spark jobs and the training job read"
-  value       = "s3://${aws_s3_bucket.gold.id}/${aws_s3_object.features_json.key}"
+  value       = "s3://${aws_s3_bucket.model.id}/${aws_s3_object.features_json.key}"
 }

@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deploys the collectors and turns them on.
+# Deploys the ingest Lambda.
 #
-# This is the layer that makes the project start collecting data. The
-# station_status poller begins on apply and never stops: there is no published
-# archive of dock occupancy, so every day it is not running is validation data
-# that cannot be recovered (pipelines.md 0.5).
+# Nothing starts running when this applies. The function downloads published
+# archives and is invoked by hand through scripts/10_ingest.sh -- there is no
+# schedule, because there is no live data in this project.
 #
-# Requires deploy-lake.sh to have run.
+# Requires deploy-storage.sh to have run.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -31,5 +30,5 @@ echo "==> terraform apply (ingestion)"
 terraform -chdir="$LAYER_DIR" apply -input=false "$@"
 
 echo
-echo "Collectors live. The poller is now writing to /raw/station_status/."
-echo "Kick off the historical backfill with:  scripts/10_ingest.sh"
+echo "Ingest function deployed. Download the archives with:"
+echo "  scripts/10_ingest.sh"

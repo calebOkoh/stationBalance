@@ -9,13 +9,13 @@
 # Usage:  ./30_train.sh [job-name-suffix]
 source "$(dirname "${BASH_SOURCE[0]}")/_env.sh"
 
-GOLD_BUCKET="$(tf_output lake gold_bucket)"
+MODEL_BUCKET="$(tf_output storage model_bucket)"
 SM_ROLE="$(tf_output pipeline sagemaker_role_arn)"
 INSTANCE="$(tf_output pipeline training_instance_type)"
 
 SUFFIX="${1:-$(date -u +%Y%m%dT%H%M%SZ)}"
 JOB_NAME="station-balance-$SUFFIX"
-SOURCE_URI="s3://$GOLD_BUCKET/code/training-source.tar.gz"
+SOURCE_URI="s3://$MODEL_BUCKET/code/training-source.tar.gz"
 
 echo "==> packaging the training source"
 STAGE="$(mktemp -d)"
@@ -23,7 +23,7 @@ cp "$PROJECT_ROOT/pipelines/training/train.py" "$STAGE/"
 cp "$PROJECT_ROOT/pipelines/training/requirements.txt" "$STAGE/"
 # features.json rather than the YAML: the training container has no PyYAML
 # guarantee either, and this is the same rendered contract the Spark phases read.
-aws s3 cp "s3://$GOLD_BUCKET/code/features.json" "$STAGE/features.json"
+aws s3 cp "s3://$MODEL_BUCKET/code/features.json" "$STAGE/features.json"
 tar -czf "$STAGE/training-source.tar.gz" -C "$STAGE" train.py requirements.txt features.json
 aws s3 cp "$STAGE/training-source.tar.gz" "$SOURCE_URI"
 rm -rf "$STAGE"
@@ -41,11 +41,11 @@ aws sagemaker create-training-job \
     \"sagemaker_submit_directory\": \"\\\"$SOURCE_URI\\\"\"
   }" \
   --input-data-config "[
-    {\"ChannelName\": \"train\", \"DataSource\": {\"S3DataSource\": {\"S3DataType\": \"S3Prefix\", \"S3Uri\": \"s3://$GOLD_BUCKET/gold/train/\", \"S3DataDistributionType\": \"FullyReplicated\"}}},
-    {\"ChannelName\": \"validation\", \"DataSource\": {\"S3DataSource\": {\"S3DataType\": \"S3Prefix\", \"S3Uri\": \"s3://$GOLD_BUCKET/gold/val/\", \"S3DataDistributionType\": \"FullyReplicated\"}}},
-    {\"ChannelName\": \"test\", \"DataSource\": {\"S3DataSource\": {\"S3DataType\": \"S3Prefix\", \"S3Uri\": \"s3://$GOLD_BUCKET/gold/test/\", \"S3DataDistributionType\": \"FullyReplicated\"}}}
+    {\"ChannelName\": \"train\", \"DataSource\": {\"S3DataSource\": {\"S3DataType\": \"S3Prefix\", \"S3Uri\": \"s3://$MODEL_BUCKET/training/train/\", \"S3DataDistributionType\": \"FullyReplicated\"}}},
+    {\"ChannelName\": \"validation\", \"DataSource\": {\"S3DataSource\": {\"S3DataType\": \"S3Prefix\", \"S3Uri\": \"s3://$MODEL_BUCKET/training/val/\", \"S3DataDistributionType\": \"FullyReplicated\"}}},
+    {\"ChannelName\": \"test\", \"DataSource\": {\"S3DataSource\": {\"S3DataType\": \"S3Prefix\", \"S3Uri\": \"s3://$MODEL_BUCKET/training/test/\", \"S3DataDistributionType\": \"FullyReplicated\"}}}
   ]" \
-  --output-data-config "{\"S3OutputPath\": \"s3://$GOLD_BUCKET/models/\"}" \
+  --output-data-config "{\"S3OutputPath\": \"s3://$MODEL_BUCKET/models/\"}" \
   --resource-config "{\"InstanceType\": \"$INSTANCE\", \"InstanceCount\": 1, \"VolumeSizeInGB\": 50}" \
   --stopping-condition "{\"MaxRuntimeInSeconds\": 7200}" \
   --tags "Key=service,Value=station-balance Key=step,Value=training" \
@@ -65,5 +65,5 @@ if [[ "$STATUS" != "Completed" ]]; then
 fi
 
 echo
-echo "Artifacts: s3://$GOLD_BUCKET/models/$JOB_NAME/output/model.tar.gz"
+echo "Artifacts: s3://$MODEL_BUCKET/models/$JOB_NAME/output/model.tar.gz"
 echo "Publish them with:  ./40_publish_model.sh $JOB_NAME"

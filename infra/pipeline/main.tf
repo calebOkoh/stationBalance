@@ -1,7 +1,7 @@
 ###############################################################################
 # Pipeline layer — the batch compute the architecture draws: EMR Serverless for
 # phases 2-5, SageMaker for phase 6, and the model package group that is the
-# handoff to Pipeline 2.
+# handoff to any future inference path.
 #
 # Nothing in this layer runs on a schedule. Pipeline 1 "runs a handful of
 # times, attended" (.claude/decisions.md), so ordering comes from the numbered
@@ -12,17 +12,17 @@
 data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
-data "aws_s3_bucket" "raw" {
+data "aws_s3_bucket" "data" {
   bucket = coalesce(
-    var.raw_bucket_name,
-    "${var.service}-lake-${data.aws_caller_identity.current.account_id}",
+    var.data_bucket_name,
+    "${var.service}-data-${data.aws_caller_identity.current.account_id}",
   )
 }
 
-data "aws_s3_bucket" "gold" {
+data "aws_s3_bucket" "model" {
   bucket = coalesce(
-    var.gold_bucket_name,
-    "${var.service}-gold-${data.aws_caller_identity.current.account_id}",
+    var.model_bucket_name,
+    "${var.service}-model-${data.aws_caller_identity.current.account_id}",
   )
 }
 
@@ -96,40 +96,40 @@ resource "aws_iam_role" "emr" {
 }
 
 data "aws_iam_policy_document" "emr" {
-  # Reads /raw, writes /bronze and /silver. It does NOT get write access to
-  # raw/ -- that zone is immutable by design (pipelines.md 0.1), and a Spark
-  # job with a bad output path is exactly how that invariant gets broken.
+  # Reads raw/, writes parsed/ and clean/. It does NOT get write access to
+  # raw/ -- those are the downloaded archives, and a Spark job with a bad
+  # output path is exactly how that invariant gets broken.
   statement {
-    sid       = "ReadRawZone"
+    sid       = "ReadRawArchives"
     actions   = ["s3:GetObject"]
-    resources = ["${data.aws_s3_bucket.raw.arn}/raw/*"]
+    resources = ["${data.aws_s3_bucket.data.arn}/raw/*"]
   }
 
   statement {
-    sid = "WriteDerivedZones"
+    sid = "WriteDerivedData"
     actions = [
       "s3:GetObject", "s3:PutObject", "s3:DeleteObject",
       "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts",
     ]
     resources = [
-      "${data.aws_s3_bucket.raw.arn}/bronze/*",
-      "${data.aws_s3_bucket.raw.arn}/silver/*",
-      "${data.aws_s3_bucket.gold.arn}/gold/*",
-      "${data.aws_s3_bucket.gold.arn}/models/*",
-      "${data.aws_s3_bucket.gold.arn}/emr-logs/*",
+      "${data.aws_s3_bucket.data.arn}/parsed/*",
+      "${data.aws_s3_bucket.data.arn}/clean/*",
+      "${data.aws_s3_bucket.model.arn}/training/*",
+      "${data.aws_s3_bucket.model.arn}/models/*",
+      "${data.aws_s3_bucket.model.arn}/emr-logs/*",
     ]
   }
 
   statement {
     sid       = "ReadJobCode"
     actions   = ["s3:GetObject"]
-    resources = ["${data.aws_s3_bucket.gold.arn}/code/*"]
+    resources = ["${data.aws_s3_bucket.model.arn}/code/*"]
   }
 
   statement {
     sid       = "ListBuckets"
     actions   = ["s3:ListBucket", "s3:GetBucketLocation"]
-    resources = [data.aws_s3_bucket.raw.arn, data.aws_s3_bucket.gold.arn]
+    resources = [data.aws_s3_bucket.data.arn, data.aws_s3_bucket.model.arn]
   }
 
   # Catalog access is read-plus-partition-registration only. The catalog is a
@@ -171,9 +171,8 @@ resource "aws_iam_role_policy" "emr" {
 #
 # A role and a model package group, not a training job: a job is a run, and
 # runs are launched by scripts/30_train.sh. There is deliberately no SageMaker
-# ENDPOINT anywhere in this project -- the model is not on the request path,
-# inference is a Lambda writing a precomputed cube, and a warm endpoint would
-# be the second-largest line on the bill after a NAT Gateway.
+# ENDPOINT -- nothing is served. The registered model package IS the
+# deliverable; what would consume it is drawn in docs/live_inference.drawio.
 #
 # There is also no managed MLflow tracking server (~$460/mo, README section 2).
 # The model package group is the registry.
@@ -202,7 +201,7 @@ data "aws_iam_policy_document" "sagemaker" {
   statement {
     sid       = "ReadTrainingData"
     actions   = ["s3:GetObject", "s3:ListBucket"]
-    resources = [data.aws_s3_bucket.gold.arn, "${data.aws_s3_bucket.gold.arn}/*"]
+    resources = [data.aws_s3_bucket.model.arn, "${data.aws_s3_bucket.model.arn}/*"]
   }
 
   statement {
@@ -210,7 +209,7 @@ data "aws_iam_policy_document" "sagemaker" {
     actions = [
       "s3:PutObject", "s3:AbortMultipartUpload", "s3:ListMultipartUploadParts",
     ]
-    resources = ["${data.aws_s3_bucket.gold.arn}/models/*"]
+    resources = ["${data.aws_s3_bucket.model.arn}/models/*"]
   }
 
   statement {

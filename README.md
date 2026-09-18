@@ -1,43 +1,68 @@
 # Indego Station Capacity Prediction
 
-Modelling the effect of **weather**, **time of day / day of week**, and **street closures** on dock capacity at Indego bikeshare stations in Philadelphia.
+Modelling the effect of **weather** and **time of day / day of week** on dock capacity at Indego bikeshare stations in Philadelphia.
+
+This repository builds a **pre-trained model** from historical data. Nothing in it reads a live feed, serves a prediction, or runs on a schedule. Real-time inference is a design deliverable only — see [`docs/live_inference.drawio`](docs/live_inference.drawio).
 
 ---
 
 ## 1. Objective
 
-Quantify and predict how three external factors drive dock availability at each Indego station:
+Quantify how external factors drive dock availability at each Indego station:
 
 1. **Weather** — temperature, precipitation, wind, cloud cover
 2. **Temporal** — hour of day, day of week, holidays, daylight
-3. **Street closures** — permitted lane closures and utility work near the station
 
-The deliverable is twofold:
+The deliverable is a **registered model bundle**: the trained model, the feature
+contract it was trained under, its test metrics, and the SHAP attribution per
+factor group. Attribution is the research question, not a by-product of
+prediction.
 
-- **Attribution** — the measured effect size of each factor group (this is the research question, not a by-product of prediction)
-- **Prediction** — for a given station and hour, the probability that the station is empty or full
+### Street closures — cut
 
-### Downstream consumer
+A third factor, permitted lane closures near the station, was scoped and then
+dropped. PGW is the only source with real closure history, and it publishes
+each closure as a bare text address with no coordinates. Turning ~108 K of
+those into points needs a street-name normaliser and a street-centerline range
+join that do not exist, and the work is open-ended against a fixed date.
 
-A web tool (out of scope for this repository, documented here only to constrain the inference contract) will render a map of Indego stations showing current capacity. Clicking a station reveals a **capacity tendency graph**: probability of being empty as a function of time of day, conditioned on the model's factors. The web tool is a visualisation layer only — all logic lives in the inference pipeline.
+Rather than ship a closure feature that is mostly noise, the arm is cut and
+this project measures **two factors, not three**. That is stated here, in
+`features.yaml`, and in every model's `metrics.json`, rather than implied by a
+column of zeros. The rationale is recorded in `.claude/decisions.md`.
 
 ---
 
 ## 2. Architecture
 
-![AWS architecture for the Indego station-capacity pipeline](docs/aws_architecture.drawio.svg)
+Two diagrams, deliberately separate, because they describe two different things:
 
-Source: **[`docs/aws_architecture.drawio.svg`](docs/aws_architecture.drawio.svg)** — a hybrid file. It renders as an SVG here and carries the editable draw.io model in its `content` attribute, so opening it in the draw.io desktop app, <https://app.diagrams.net>, or the VS Code *Draw.io Integration* extension gives you the live diagram. One file, so the picture and the model cannot drift apart.
+| File | What it is |
+|---|---|
+| **[`docs/pretrained_model.drawio`](docs/pretrained_model.drawio)** | **Built and deployed.** The batch training pipeline: download archives → process → train → register. Every input is historical. |
+| **[`docs/live_inference.drawio`](docs/live_inference.drawio)** | **Not built.** What would exist if real-time inference were added, and how live data would interact with the trained model. |
 
-Three constraints the diagram exists to make explicit:
+Open either in the draw.io desktop app, <https://app.diagrams.net>, or the VS
+Code *Draw.io Integration* extension.
+
+The split is the point. Everything that touches a live feed — GBFS
+`station_status`, the live weather forecast, DynamoDB, API Gateway, CloudFront —
+lives in the inference diagram and **only** there. The training pipeline has no
+live input, no schedule, and no serving path. Keeping them in one picture is
+what let live-data machinery creep into a historical-attribution project in the
+first place.
+
+The only thing crossing from one to the other is the model bundle itself.
+
+Three constraints the training diagram exists to make explicit:
 
 | Constraint | Why it matters |
 |---|---|
-| The lake is drawn as zones with `EMR Serverless` looping through them | The read-transform-write cycle is where phases 2–5 actually live; one opaque store hides it |
-| `station_status` is dashed into training | It is ground truth for ledger validation (step 6.6) **only** — never a feature. The easiest constraint in this project to violate by accident |
-| The model is not on the request path | Inference writes a precomputed cube to DynamoDB on a schedule; API Gateway reads DynamoDB. ~250 stations × 48 hours ≈ 12 K rows, so enumerating beats serving live and a failed run degrades to stale data, not a 5xx |
+| Storage is drawn as prefixes with `EMR Serverless` looping through them | The read-transform-write cycle is where phases 2–5 actually live; one opaque store hides it |
+| Nothing is on a schedule | Every run is attended. There is no EventBridge resource in the account, and `scripts/00_preflight.sh` asserts that |
+| The model is registered, not served | The deliverable is the bundle in the SageMaker Model Registry. No endpoint, no API, nothing warm |
 
-**Sizing and cost.** EMR Serverless at driver 4 vCPU / 16 GB, executors 4 × 4 vCPU, `preInitializedCapacity` **0** — ~$1–2 per pipeline run. SageMaker training on one `ml.m5.4xlarge`, ~$0.25 per run. Steady state is under $5/month. Every meaningful cost risk is something *left running*: a NAT Gateway ($32/mo), a managed MLflow tracking server (~$460/mo), or pre-initialised EMR capacity. Keep Lambdas out of a VPC and none apply.
+**Sizing and cost.** EMR Serverless at driver 4 vCPU / 16 GB, executors 4 × 4 vCPU, `preInitializedCapacity` **0** — ~$1–2 per pipeline run. SageMaker training on one `ml.m5.4xlarge`, ~$0.25 per run. At rest this is S3 storage and nothing else, well under $1/month. Every meaningful cost risk is something *left running*: a NAT Gateway ($32/mo), a managed MLflow tracking server (~$460/mo), or pre-initialised EMR capacity. None are provisioned.
 
 ---
 
@@ -54,45 +79,52 @@ Figures below are **measured**, not estimated — trip counts derived from the p
 | Stations | ~250 |
 | Hours in window | ~39,000 |
 | Station-hour modelling grid | **~10 M rows** (~1–2 GB Parquet at ~60 features) |
-| PGW closure permits in window | ~108 K |
-| `station_status` poller output | **72 K rows/day → ~26 M rows/year** |
-| Total lake footprint | **~3–5 GB** |
+| Total storage footprint | **~3–5 GB** |
 
-This is a **modest** volume. The entire pipeline fits in RAM on a single 16 GB machine, and the largest row generator is not the trip history but the `station_status` poller, which grows without bound.
+This is a **modest** volume. The entire pipeline fits in RAM on a single 16 GB machine.
 
 Distributed processing is justified by:
 
 1. **Step 3.1** — a global sort-and-window over the entire trip history partitioned by `bike_id`. This is the genuine shuffle-heavy stage and the peak memory consumer. Note that 5.16 M rows is not, on its own, Spark-scale.
 2. **The architectural requirement of the project itself.** This is the honest primary justification and should be stated as such.
 
-It is **not** justified by raw input size, and not by the closure arm: PGW permits are hour-scale, so ~108 K permits expand to ~430 K closure-hours, of which roughly 5% survive the 150 m station buffer. Be honest about this rather than overstating the data volume — a reviewer who checks the numbers should find them conservative, not inflated.
+It is **not** justified by raw input size. Be honest about this rather than overstating the data volume — a reviewer who checks the numbers should find them conservative, not inflated.
 
 ---
 
 ## 4. Data Sources
 
-Full machine-readable inventory: **`indego_capacity_data_sources.csv`** (16 sources, endpoints, formats, auth requirements, caveats).
-
-Summary of the primary sources:
+Full machine-readable inventory: **`indego_capacity_data_sources.csv`** (17 sources, endpoints, formats, auth requirements, caveats). Three of them are used.
 
 | Source | Role |
 |---|---|
 | Indego Trip Data (quarterly CSV) | Complete event log of ridden movement. Basis of all label construction. |
-| Indego GBFS `station_information` | Station capacity, latitude/longitude |
-| Indego GBFS `station_status` | Live occupancy. Inference input + the only ground truth for validation. |
-| Open-Meteo Historical Forecast | Training weather features |
-| Open-Meteo Forecast | Inference weather features |
-| **PGW Street Lane Closures** | **PRIMARY closure history.** Gas-main utility closures via SOAP `GetEUNHistory`. Verified dense coverage December 2009 → present. Addresses only — no geometry (see 2.6) |
-| Philadelphia Street Lane Closures | **Inference path only.** Current-state layer; expired permits are purged, so it holds no usable history before 2025. Keep the daily snapshot running so history accrues going forward |
-| PASDA Bike Network / Street Centerlines | Determines which closures actually block a *cycling* route |
+| Indego Station Table (CSV) | `go live date`, required in 3.4 so pre-launch stations are not scored as zero-demand |
+| Open-Meteo Historical Forecast | Weather features for the training window |
 
-### Critical data gap
+Everything else in the inventory is either a **live feed** — GBFS
+`station_status`, GBFS `station_information`, the live Open-Meteo forecast, the
+current-state ArcGIS closure layer — or part of the cut closure arm. Live feeds
+belong to `docs/live_inference.drawio`. None is downloaded here.
 
-**There is no published historical archive of dock-level occupancy.** GBFS `station_status` is a live snapshot only. The label must therefore be reconstructed from trip data — see section 5.
+All three retained sources are `Auth Required: No`, which is why there is no
+Secrets Manager in the architecture.
+
+### Two gaps worth stating plainly
+
+**There is no published historical archive of dock-level occupancy.** GBFS
+`station_status` is a live snapshot only. The label must therefore be
+reconstructed from trip data — see section 5.
+
+**There is no published historical capacity either.** Stations have been
+resized and only the current dock count is available, from a live feed this
+project does not use. Capacity is therefore derived from the reconstructed
+occupancy itself (step 3.7), which is self-consistent but means `pct_full` is
+an estimate, not a measurement.
 
 ---
 
-## 5. Method and Pipelines
+## 5. Method
 
 ### The label problem
 
@@ -103,27 +135,32 @@ This yields **two tiers of label**:
 | Tier | Variable | Error |
 |---|---|---|
 | **Tier 1** | `net_flow(s,t)` = `arr − dep` | **Zero.** Counted directly from trip endpoints |
-| Tier 2 | `O(s,t)`, `pct_full`, `is_empty` | Estimated — clamped cumulative ledger plus a solved initial condition |
+| Tier 2 | `O(s,t)`, `pct_full`, `is_empty` | Estimated — a cumulative ledger plus a solved initial condition |
 
-**Train on Tier-1 `net_flow`.** At inference the true current occupancy is available from `station_status`, so the model only needs to predict the *change* — which is exactly what weather, time and closures drive — and reconstruction error never enters the learned weights. Tier 2 is retained as an input feature and as the basis of the `is_empty` classifier the web tool displays. This also keeps the deliverables independent of Tier-2 validation, which falls outside this scope (§6).
+**Train on Tier-1 `net_flow`.** It is counted rather than reconstructed, so reconstruction error never enters the learned weights, and predicting the *change* is exactly what weather and time drive. Tier 2 is retained as an input feature and as the basis of the `is_empty` classifier.
 
-### Pipeline 1 — Pre-Training
+`O(s,0)` is one unknown scalar per station. The original design pinned it with `0 ≤ O ≤ capacity`, taking the midpoint of the feasible interval — but that needs a published capacity, and the only source was a live feed. So the lower constraint alone is used: `O(s,0) = −min(cumulative delta)`, the smallest start that keeps occupancy non-negative. **The level is therefore a lower bound rather than a centred estimate. The shape of the series, which is what the features predict, is unaffected.** Capacity is then the rolling 90-day maximum of the result, which is self-consistent by construction.
+
+### The pipeline
+
+Six phases, run in order, by hand.
 
 | Phase | Does | Watch out for |
 |---|---|---|
-| **0 · Infrastructure** | Lake zones, catalog, `features.yaml`, start the `station_status` poller | The poller feeds step 6.6 only and is not on the critical path, but start it on day one — the data cannot be backfilled |
-| **1 · Ingest** | Trip archives, station table, closures, geo layers, weather → `/raw` → `/bronze` | PGW is the only real closure history; the ArcGIS layer holds none before 2025 |
-| **2 · Conform** | Normalise schema, localise timestamps, filter, dedupe → `silver.trips`; resolve PGW addresses to geometry | DST breaks any naive local-time join; `Virtual Station` rows corrupt mass balance |
-| **3 · Labels** | Bike trajectories, rebalancing events, station-hour grid, `net_flow`, occupancy ledger | Step 3.1 must be a **single global pass** — partitioning by quarter injects a false rebalance every 3 months |
-| **4 · Features** | Reproject to EPSG:2272, filter closures to bike-relevant, expand to hours, spatial join, weather, calendar, lags | Buffering in Web Mercator inflates distances ~1.29× at Philadelphia's latitude |
-| **5 · Assembly** | Wide table, **chronological** split, fit encoders on train only, class weights | Never random-split — it leaks future weather and inflates metrics |
-| **6 · Train** | Baselines, `net_flow` regressor, `is_empty` classifier, tune, evaluate, attribute | Evaluate on test exactly once; attribution is a deliverable, not a by-product |
+| **1 · Land** | Trip ZIPs, station CSV, weather JSON → Parquet | Nothing is cleaned here; that is phase 2's job, so a bad filter rule can be fixed without re-downloading |
+| **2 · Conform** | Normalise schema, localise timestamps, filter, dedupe | DST breaks any naive local-time join; `Virtual Station` rows corrupt mass balance |
+| **3 · Labels** | Bike trajectories, rebalancing events, station-hour grid, `net_flow`, occupancy ledger | Must be a **single global pass** — partitioning by quarter injects a false rebalance every 3 months |
+| **4 · Features** | Weather join, calendar features, lags | The leakage audit is a hard stop, not a warning |
+| **5 · Assembly** | Wide table, **chronological** split, class weights | Never random-split — it leaks future weather and inflates metrics |
+| **6 · Train** | Baseline, `net_flow` regressor, `is_empty` classifier, tune, evaluate, attribute | Evaluate on test exactly once; attribution is a deliverable, not a by-product |
 
-### Pipeline 2 — Inference
+Phases 1–5 run on EMR Serverless; phase 6 on SageMaker. Ordering comes from the numbered scripts in `scripts/`, not from an orchestrator — every run is attended, and a numbered script lets you stop halfway and inspect.
 
-Loads the artifact bundle from 6.8, reads live `station_status` for the integration constant `O(s,t₀)`, live Open-Meteo using the **identical** variable list pinned in `features.yaml`, and the current closure layer at the **same** buffer distance used in 4.4. Calendar features come from **shared code** with 4.6. It predicts `net_flow` forward, integrates from `O(s,t₀)`, and emits calibrated `P(empty)` per station per hour.
+### No inference pipeline
 
-Live data is used **only** at inference. It is never a training input.
+There is no second pipeline. The model is registered and that is the end of the deliverable.
+
+What a live inference path would have to honour — the identical feature list and order from `features.json`, calendar features from `pipelines/calendarfeat.py` rather than a reimplementation, and live `station_status` supplying only the integration constant `O(s,t₀)` — is drawn in `docs/live_inference.drawio`. `calendarfeat.py` is deliberately Spark-free so that path could import the same file.
 
 ---
 
@@ -133,31 +170,36 @@ Live data is used **only** at inference. It is never a training input.
 
 | Check | Expected | Failure meaning |
 |---|---|---|
-| Global mass balance | `Σ reb_in == Σ reb_out` exactly, by construction | Pairing logic bug |
-| Clamp violation rate | Low single-digit % per station | Timing error; concentrates at stations with heavy van activity |
+| Global mass balance | `Σ reb_in == Σ reb_out` for rebalancing events, exactly, by construction | Pairing logic bug. Fleet entry/exit are deliberately unpaired, so a difference equal to the fleet event count is expected |
+| Hours at zero occupancy | Low — well under 15% | The ledger is drifting downward and the gap rules are emitting too many `reb_out` events |
 | Out-of-system fleet count over time | Smooth few-% of fleet with a maintenance-shaped seasonal bump | A sawtooth means the 6h / 72h thresholds are mis-set |
 
-### Recovery test (steps 3.2 / 3.3)
+### Recovery test (steps 3.2 / 3.3) — a gate, not a nice-to-have
 
-The ledger diagnostics above check internal consistency; they do not check that the event-emission rules are *correct*. Verify the logic directly and without external data: take a real slice of `silver.trips`, inject synthetic van moves with known station pairs and timings, run 3.1–3.3, and assert exact recovery of every injected move.
+The ledger diagnostics above check internal consistency; they do not check that the event-emission rules are *correct*. `tests/test_recovery.py` does, without external data: it injects synthetic van moves with known station pairs and timings, runs the **actual** 3.2 / 3.3 functions imported from `pipelines/labels/job.py`, and asserts exact recovery of every injected move. It also asserts that two trips either side of a quarter boundary at the same station produce **no** event — the specific failure a per-quarter pass would introduce.
 
-This validates the emission **logic**. The 6h / 72h / 30d thresholds are **priors** and are not validated within this scope — step 6.6 would do that, and it requires a trip archive overlapping the polling window, which is not available in this timeframe. **Tier 2 therefore ships diagnostically consistent but without a numeric error bar, and is reported that way.** Tier-1 `net_flow` is counted rather than reconstructed, so training, evaluation and attribution are unaffected.
+It needs Spark, so it skips in a plain Python environment. **That skip is not a pass.** Run it before trusting phase 3 output:
+
+```bash
+spark-submit tests/test_recovery.py
+```
+
+This validates the emission **logic**. The 6h / 72h / 30d thresholds are **priors** and are not validated: doing so needs a trip archive overlapping a window of recorded live dock counts, and this project records none. **Tier 2 therefore ships diagnostically consistent but without a numeric error bar, and is reported that way** — `metrics.json` says so explicitly. Tier-1 `net_flow` is counted rather than reconstructed, so training, evaluation and attribution are unaffected.
 
 ### Modelling gates
 
 - Chronological split only (5.2)
-- Transformers fitted on train split only (5.3)
-- Leakage audit passed for every feature (4.8)
+- Leakage audit passed for every feature (4.8) — this one **hard-fails the job**, because the failure it prevents is silent
 - Full model beats the (station, hour, weekday) mean baseline (6.1)
 
 ---
 
 ## 7. Highest-Risk Items
 
-1. **Step 2.6 — PGW address resolution.** PGW returns addresses as strings with no geometry, so the entire closure arm depends on a street-name normalisation and centerline range join **that does not exist yet**. It gates one of the three factors the research question is about, and street-name normalisation is open-ended work. Validate against the ~203 known-good coordinates in `LaneClosure_EUN_XY` before trusting the other ~108 K. **Timebox it.** If the centerline join does not clear that gate within budget, the closure feature degrades to permit counts per tract-hour, which need no per-address geometry.
-2. **Step 3.1 — the global `bike_id` pass.** The one stage where a partitioning mistake produces plausible-looking but wrong output that no downstream check will obviously catch. Mitigated by the recovery test in §6, which is why that test is a gate and not a nice-to-have.
-3. **Step 4.1 — CRS handling.** Buffering in the wrong projection yields silently incorrect closure features, and the model will simply learn nothing from the closure arm.
-4. **Step 0.5 — the `station_status` poller.** It gates nothing in this delivery, but it is ~20 lines and the data cannot be backfilled. Start it on day one so step 6.6 is possible later.
+1. **Step 3.1 — the global `bike_id` pass.** The one stage where a partitioning mistake produces plausible-looking but wrong output that no downstream check will obviously catch. Mitigated by the recovery test in §6, which is why that test is a gate.
+2. **Schema drift across quarters.** 18 quarterly archives with drifting column names. The mapping in `pipelines/conform/job.py` is explicit and **asserted** — an unrecognised schema stops the job rather than silently nulling a column. Expect to add aliases on the first run.
+3. **Tier-2 occupancy is unvalidated.** The level is a lower bound and the gap thresholds are stated priors. This is fine for the deliverable — attribution rests on Tier-1 — but any use of `pct_full` or `is_empty` as a measurement rather than an estimate is unsupported.
+4. **Two factors, not three.** The closure arm is cut (§1). If the attribution result is weaker than hoped, the absent third factor is a real candidate explanation and should be named as one.
 
 ---
 
@@ -165,73 +207,71 @@ This validates the emission **logic**. The 6h / 72h / 30d thresholds are **prior
 
 ```
 .
-├── README.md                           # This file — scope, sources, method summary
+├── README.md                           # This file — scope, sources, method
 ├── indego_capacity_data_sources.csv    # Source inventory with verified coverage
-├── features.yaml                       # Shared feature config (step 0.4)
+├── features.yaml                       # The feature contract (step 0.4)
 ├── docs/
-│   └── aws_architecture.drawio         # Deployed AWS architecture
-├── infra/                              # Terraform, four layers + deploy scripts
-│   ├── lake/                           # S3 zones, Glue catalog, Athena, budget
-│   ├── ingestion/                      # Collector Lambdas + schedules (0.5, 1.3, 1.5)
-│   ├── pipeline/                       # EMR Serverless, SageMaker role, registry
-│   ├── serving/                        # DynamoDB, Pipeline 2, HTTP API, CloudFront
+│   ├── pretrained_model.drawio         # BUILT — the training pipeline
+│   └── live_inference.drawio           # NOT BUILT — what serving would look like
+├── infra/                              # Terraform, three layers + deploy scripts
+│   ├── storage/                        # Two S3 buckets, Glue catalog, Athena, budget
+│   ├── ingestion/                      # The ingest Lambda. No schedules.
+│   ├── pipeline/                       # EMR Serverless, SageMaker role, model registry
 │   └── deploy-*.sh                     # One per layer, plus deploy-all.sh
-├── src/lambdas/                        # Deployed function source
-│   ├── common/                         # lakeio.py, calendarfeat.py — SHARED by both pipelines
-│   ├── ingest/                         # Phase 1 (drawio `g1`)
-│   ├── poller/                         # station_status, 5-min (drawio `g3`, step 0.5)
-│   ├── inference/                      # Pipeline 2 (drawio `inf`) + pure-Python LightGBM scorer
-│   ├── status_refresh/                 # Live dock counts (drawio `stat`)
-│   └── api/                            # Read path behind API Gateway
+├── src/lambdas/
+│   ├── common/lakeio.py                # Fetch + S3 helpers
+│   └── ingest/handler.py               # trips | stations | weather
 ├── pipelines/                          # EMR Serverless Spark jobs + SageMaker entrypoint
-│   ├── lib.py                          # Shared session/zone/config plumbing
+│   ├── lib.py                          # Session, storage paths, config loading
+│   ├── calendarfeat.py                 # Step 4.6 — Spark-free, so inference could reuse it
+│   ├── land/                           # Phase 1 — archives → Parquet
 │   ├── conform/                        # Phase 2
 │   ├── labels/                         # Phase 3
 │   ├── features/                       # Phase 4
 │   ├── assembly/                       # Phase 5
 │   └── training/                       # Phase 6
 ├── scripts/                            # The attended running order, numbered
-│   ├── 00_preflight.sh  10_ingest.sh  20_run_phase.sh  30_train.sh  40_publish_model.sh
-│   ├── pgw_backfill.py                 # Step 1.6, one-time, run from a laptop
-│   └── build_lambdas.sh  run_tests.sh
 └── tests/
     ├── test_recovery.py                # The 3.2/3.3 recovery GATE (needs Spark)
-    ├── test_gbdt.py                    # The inference scorer
     └── test_calendarfeat.py            # Shared calendar features
 ```
 
-### Deploying
+### Running it
 
 `infra/README.md` has the detail. The short version:
 
 ```bash
-cd infra && ./deploy-all.sh          # lake → ingestion → pipeline → serving
+cd infra && ./deploy-all.sh          # storage → ingestion → pipeline
 ```
 
-Ingestion starts on apply and the public endpoint comes up immediately,
-returning 503 until a model exists. Everything between is attended — Pipeline 1
-"runs a handful of times, attended", so ordering comes from the numbered
-scripts rather than an orchestrator:
+Nothing starts running — there is no schedule in this project. Drive the
+phases by hand:
 
 ```bash
-scripts/00_preflight.sh                     # did the deploy land? is the poller collecting?
-scripts/10_ingest.sh                        # phase 1
-python3 scripts/pgw_backfill.py --bucket …  # step 1.6, once, ever
-scripts/20_run_phase.sh conform|labels|features|assembly
-scripts/30_train.sh                         # phase 6
-scripts/40_publish_model.sh <job-name>      # step 6.8, then enable Pipeline 2
+scripts/00_preflight.sh                  # did the deploy land?
+scripts/10_ingest.sh                     # download trips, stations, weather
+scripts/20_run_phase.sh land             # archives → Parquet
+scripts/20_run_phase.sh conform          # normalise, filter, dedupe
+scripts/20_run_phase.sh labels           # bike_id trajectories → net_flow
+scripts/20_run_phase.sh features         # weather + calendar + lags
+scripts/20_run_phase.sh assembly         # wide table, chronological split
+scripts/30_train.sh                      # train, evaluate, attribute
+scripts/40_publish_model.sh <job-name>   # register the model
 ```
+
+Roughly 2–3 hours end to end, most of it unattended. `scripts/run_tests.sh`
+runs the unit tests; the recovery gate needs `spark-submit` (§6).
 
 ---
 
 ## 9. Open Parameters
 
-Unresolved values that affect implementation. Everything else is decided; the reasoning and the
-rejected alternatives are recorded in `.claude/decisions.md`.
+Unresolved values that affect implementation. Everything else is decided; the
+reasoning and the rejected alternatives are recorded in `.claude/decisions.md`.
 
 | Parameter | Current position |
 |---|---|
-| Closure→station buffer distance | 150 m starting point; treat as a hyperparameter and test sensitivity |
-| Gap thresholds 6h / 72h / 30d | Ship as stated priors — no validation set exists in this timeframe (§6) |
-| Training window start | 2022 Q1 recommended — consistent schema, post-COVID regime, e-bikes present |
+| Gap thresholds 6h / 72h / 30d | Ship as stated priors — no validation set exists (§6) |
+| Training window start | 2022 Q1 — consistent schema, post-COVID regime, e-bikes present |
 | Censoring treatment | Observed flow understates demand at saturated stations. Options: censored regression (Tobit), or train only on non-saturated hours |
+| Weather grid point | One point for the whole city. The reanalysis grid is ~11 km and the station footprint is smaller than one cell, so more points would repeat the same numbers |

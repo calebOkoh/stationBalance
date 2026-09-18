@@ -1,36 +1,57 @@
 # Infrastructure
 
-Four Terraform layers, applied in order. Each is a separate root module with
-its own local state under `infra/states/`, and each is driven by a
-`deploy-<layer>.sh` script that does `init` then `apply` with the right
-working directory.
+Three Terraform layers, applied in order. Each is a separate root module with
+its own local state under `infra/states/`, driven by a `deploy-<layer>.sh`
+script that does `init` then `apply` from the right working directory.
 
 ```
 ./deploy-all.sh          # everything, in order
-./deploy-lake.sh         # 1. S3 zones, Glue catalog, Athena, budget
-./deploy-ingestion.sh    # 2. collectors + schedules   <- starts collecting
+./deploy-storage.sh      # 1. two S3 buckets, Glue catalog, Athena, budget
+./deploy-ingestion.sh    # 2. the ingest Lambda
 ./deploy-pipeline.sh     # 3. EMR Serverless, SageMaker role, model registry
-./deploy-serving.sh      # 4. DynamoDB, Pipeline 2 Lambdas, HTTP API, CloudFront
 ./destroy-all.sh         # reverse order, with a typed confirmation
 ```
 
-`lake` must go first: the other three resolve its buckets by name through a
+`storage` must go first: the other two resolve its buckets by name through a
 `data "aws_s3_bucket"` lookup rather than reading its state, so the layers stay
-decoupled but the ordering is real. The remaining three are independent of each
-other.
+decoupled but the ordering is real.
 
-## What running `deploy-all.sh` actually gets you
+## Nothing runs on its own
 
-Ingestion starts. The `station_status` poller begins writing to
-`/raw/station_status/` within five minutes of apply and does not stop — that
-data has no published archive and cannot be backfilled, which is why it is the
-one thing that starts on its own.
+There is no EventBridge rule, no Step Functions state machine, and no scheduled
+anything in this project. Every input is a published archive downloaded once,
+and every phase is started by hand from `scripts/`.
 
-It does **not** get you a trained model. Pipeline 1 is attended by design:
-`.claude/decisions.md` cut Step Functions because every run is attended and
-"numbered scripts give the same ordering with better debuggability — you can
-stop halfway and inspect." The phases are driven by `scripts/`, in order, and
-`scripts/40_publish_model.sh` is what turns Pipeline 2 on.
+That is not a simplification — it follows from the scope. This repository
+builds a **pre-trained model** from historical data. Anything that reads a live
+feed belongs to the inference architecture in
+`docs/live_inference.drawio`, which is a design deliverable and is not built.
+`scripts/00_preflight.sh` asserts the schedule count is zero for exactly this
+reason.
+
+## Storage layout
+
+Two buckets. Plain prefix names, in the order data moves through them:
+
+**`station-balance-data-<account>`**
+
+| Prefix | Holds |
+|---|---|
+| `raw/` | Exactly what was downloaded, byte for byte. Versioned, never rewritten. |
+| `parsed/` | The same data as Parquet. No cleaning, no filtering. |
+| `clean/` | Conformed, filtered, deduplicated, and labelled. |
+
+**`station-balance-model-<account>`**
+
+| Prefix | Holds |
+|---|---|
+| `training/` | The wide modelling table and the frozen train/val/test splits. |
+| `models/` | Exported model bundles, plus `models/current/`. |
+| `code/` | Spark job source, `features.json`, the training tarball. |
+| `athena-results/`, `emr-logs/` | Query output and driver logs. Both expire. |
+
+Everything is reproducible from `raw/`, which is why only that prefix is
+treated as precious.
 
 ## Tagging
 
@@ -38,51 +59,46 @@ stop halfway and inspect." The phases are driven by `scripts/`, in order, and
 provider's `default_tags`, so nothing has to be tagged individually and nothing
 can be missed.
 
-`step` is set per resource, because it varies. It names the resource's role in
-the ML pipeline, so cost and inventory can be sliced by phase:
+`step` is set per resource and names its role in the pipeline, so cost and
+inventory can be sliced by phase:
 
 | `step` | Covers |
 |---|---|
-| `ingestion` | raw bucket, both collector Lambdas, their roles, the scheduler role |
+| `ingestion` | data bucket, the ingest Lambda and its role |
 | `catalog` | Glue database, the published `features.json` / `features.yaml` |
 | `processing` | EMR Serverless application and job role, its log group |
-| `assembly` | gold bucket |
+| `assembly` | model bucket |
 | `training` | SageMaker execution role, model package group |
 | `quality` | Athena workgroup |
-| `inference` | inference Lambda and its role |
-| `serving` | DynamoDB, API Gateway, CloudFront, status refresher, API Lambda |
 | `observability` | the monthly budget |
 
 Some resource types carry no tags at all — `aws_iam_role_policy`,
-`aws_scheduler_schedule`, `aws_glue_catalog_table`, the S3 sub-resource
-configurations and `aws_cloudfront_cache_policy` are not taggable in the AWS
-provider. They inherit their identity from the resource they attach to.
+`aws_glue_catalog_table` and the S3 sub-resource configurations are not
+taggable in the AWS provider. They inherit their identity from the resource
+they attach to.
 
 ## Cost
 
-Steady state is the collectors and storage: roughly **$1–3/month**. Nothing in
-these layers runs continuously except three schedules whose invocation counts
-sit inside the EventBridge and Lambda free tiers.
+At rest this is **S3 storage and nothing else** — a few GB, so well under
+$1/month. There is no always-on compute anywhere in the account.
 
-The choices that keep it there, all of which are load-bearing:
+Running the pipeline end to end costs roughly **$2–4**: EMR Serverless at
+~$1–2 for the batch phases, one SageMaker `ml.m5.4xlarge` training job at
+~$0.25, and Lambda invocations inside the free tier.
 
-- **No NAT Gateway.** Every Lambda is outside a VPC. A NAT Gateway is $32/mo,
-  an order of magnitude above everything else combined.
+The choices that keep it there, all load-bearing:
+
+- **No NAT Gateway.** The Lambda is outside a VPC. A NAT Gateway is $32/mo, an
+  order of magnitude above everything else combined.
 - **No pre-initialised EMR capacity.** `preInitializedCapacity` is absent
-  (therefore zero) and the application auto-stops after 15 idle minutes. A
-  pipeline run is ~$1–2; idle is $0.
-- **No SageMaker endpoint.** The model is off the request path — inference is
-  a Lambda writing a precomputed cube. A warm endpoint would be the second
-  largest line on the bill.
+  (therefore zero) and the application auto-stops after 15 idle minutes.
+- **No SageMaker endpoint.** Nothing is served, so nothing is warm.
 - **No managed MLflow tracking server** (~$460/mo). The SageMaker model package
   group is the registry.
-- **DynamoDB on-demand**, ~12 K writes/hour against a provisioned floor that
-  would never be approached.
-- **Athena is capped** at 10 GB scanned per query. The whole lake is 3–5 GB, so
+- **Athena capped** at 10 GB scanned per query. The whole dataset is 3–5 GB, so
   anything above that is a missing partition predicate, not a real result.
-- **S3 lifecycle**: Intelligent-Tiering on `/raw` (the poller grows without
-  bound), and expiry on Athena results, EMR logs, and non-current versions of
-  derived data.
+- **S3 lifecycle**: expiry on Athena results, EMR logs, and non-current
+  versions of anything derived.
 
 A monthly budget filtered on `service=station-balance` alarms at 80% forecast
 and 100% actual. Set `budget_alert_email` or the notifications are skipped.
@@ -92,11 +108,9 @@ and 100% actual. Set `budget_alert_email` or the notifications are skipped.
 | Variable | Default | Why you would change it |
 |---|---|---|
 | `aws_profile` | `coa-dev` | Must be able to create IAM roles **and attach policies** |
-| `aws_region` | `us-east-1` | Everything is single-region; there is no cross-region path |
-| `enable_collectors` | `true` | Ingestion layer. Leave on — the poller's data is unrecoverable |
-| `enable_inference` | `false` | Serving layer. Turn on after the first model bundle exists |
+| `aws_region` | `us-east-1` | Single-region; there is no cross-region path |
 | `budget_alert_email` | `""` | Empty creates the budget but no notification |
-| `raw_bucket_name` / `gold_bucket_name` | `null` | Point a layer at a lake named differently |
+| `data_bucket_name` / `model_bucket_name` | `null` | Point a layer at buckets named differently |
 
 ## State
 

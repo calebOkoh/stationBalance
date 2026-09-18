@@ -15,8 +15,8 @@ from pyspark.sql import SparkSession
 
 def parse_args(description: str):
     ap = argparse.ArgumentParser(description=description)
-    ap.add_argument("--raw-bucket", required=True)
-    ap.add_argument("--gold-bucket", required=True)
+    ap.add_argument("--data-bucket", required=True)
+    ap.add_argument("--model-bucket", required=True)
     ap.add_argument("--glue-database", required=True)
     ap.add_argument("--features", required=True,
                     help="s3:// URI of features.json (rendered from features.yaml by Terraform)")
@@ -52,19 +52,26 @@ def load_features(spark: SparkSession, uri: str) -> dict:
 
 
 class Zones:
-    """The lake paths, in one place.
+    """The storage paths, in one place.
 
-    Phases address zones by name rather than by literal s3:// strings so a
+    Phases address these by name rather than by literal s3:// strings, so a
     mistyped prefix is a NameError at submit time instead of a job that writes
-    a thousand objects into the wrong place.
+    a thousand objects somewhere nobody looks.
+
+        raw       exactly what was downloaded, byte for byte. Never written
+                  twice, never modified. Everything is reproducible from here.
+        parsed    the same data converted to Parquet. No cleaning, no filtering.
+        clean     conformed, filtered, deduplicated, and labelled.
+        training  the wide modelling table and the frozen train/val/test splits.
+        models    exported model artifacts.
     """
 
-    def __init__(self, raw_bucket: str, gold_bucket: str):
-        self.raw = f"s3://{raw_bucket}/raw"
-        self.bronze = f"s3://{raw_bucket}/bronze"
-        self.silver = f"s3://{raw_bucket}/silver"
-        self.gold = f"s3://{gold_bucket}/gold"
-        self.models = f"s3://{gold_bucket}/models"
+    def __init__(self, data_bucket: str, model_bucket: str):
+        self.raw = f"s3://{data_bucket}/raw"
+        self.parsed = f"s3://{data_bucket}/parsed"
+        self.clean = f"s3://{data_bucket}/clean"
+        self.training = f"s3://{model_bucket}/training"
+        self.models = f"s3://{model_bucket}/models"
 
 
 def log_counts(name: str, before: int, after: int) -> None:

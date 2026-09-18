@@ -9,15 +9,21 @@ require terraform
 echo "==> identity"
 aws sts get-caller-identity --output table
 
-RAW_BUCKET="$(tf_output lake raw_bucket)"
-GOLD_BUCKET="$(tf_output lake gold_bucket)"
+DATA_BUCKET="$(tf_output storage data_bucket)"
+MODEL_BUCKET="$(tf_output storage model_bucket)"
 EMR_APP="$(tf_output pipeline emr_application_id)"
-POLLER="$(tf_output ingestion poller_function_name)"
+INGEST="$(tf_output ingestion ingest_function_name)"
 
 echo
 echo "==> buckets"
-aws s3 ls "s3://$RAW_BUCKET/"  >/dev/null && echo "  raw  $RAW_BUCKET  OK"
-aws s3 ls "s3://$GOLD_BUCKET/" >/dev/null && echo "  gold $GOLD_BUCKET  OK"
+aws s3 ls "s3://$DATA_BUCKET/"  >/dev/null && echo "  data  $DATA_BUCKET  OK"
+aws s3 ls "s3://$MODEL_BUCKET/" >/dev/null && echo "  model $MODEL_BUCKET  OK"
+
+echo
+echo "==> feature contract published"
+aws s3 ls "s3://$MODEL_BUCKET/code/features.json" >/dev/null \
+  && echo "  features.json OK" \
+  || echo "  !! missing — re-run infra/deploy-storage.sh"
 
 echo
 echo "==> EMR Serverless application"
@@ -25,25 +31,25 @@ aws emr-serverless get-application --application-id "$EMR_APP" \
   --query 'application.{id:applicationId,state:state,release:releaseLabel}' --output table
 
 echo
-echo "==> is the poller actually collecting?"
-# The single most important check here. The poller gating nothing in this
-# delivery is exactly why a silent failure would go unnoticed for weeks, and
-# its data cannot be backfilled.
-TODAY="$(date -u +%Y-%m-%d)"
-COUNT="$(aws s3 ls "s3://$RAW_BUCKET/raw/station_status/dt=$TODAY/" --recursive 2>/dev/null | wc -l | tr -d ' ')"
-echo "  objects landed today ($TODAY): $COUNT"
-if [[ "$COUNT" -eq 0 ]]; then
-  echo "  !! nothing landed today. Check the schedule and the function:"
-  echo "     aws lambda invoke --function-name $POLLER /dev/stdout"
-  echo "     aws logs tail /aws/lambda/$POLLER --since 1h"
-else
-  echo "  poller is healthy (expect ~288/day at the 5-minute interval)"
-fi
+echo "==> ingest function"
+aws lambda get-function-configuration --function-name "$INGEST" \
+  --query '{name:FunctionName,runtime:Runtime,timeout:Timeout,memory:MemorySize}' --output table
 
 echo
-echo "==> model bundle present?"
-if aws s3 ls "s3://$GOLD_BUCKET/models/current/model_net_flow.txt" >/dev/null 2>&1; then
-  echo "  yes -- Pipeline 2 can run"
+echo "==> what has been downloaded so far"
+for prefix in trips stations weather; do
+  n="$(aws s3 ls "s3://$DATA_BUCKET/raw/$prefix/" --recursive 2>/dev/null | wc -l | tr -d ' ')"
+  printf '  raw/%-10s %s objects\n' "$prefix" "$n"
+done
+
+echo
+echo "==> confirm nothing is scheduled"
+# There should be no schedules at all. Anything listed here is a live-data
+# collector that does not belong in this project.
+n="$(aws scheduler list-schedules --query 'length(Schedules)' --output text 2>/dev/null || echo 0)"
+if [[ "$n" == "0" ]]; then
+  echo "  no EventBridge schedules — correct"
 else
-  echo "  no -- expected until phase 6 has run. The API will return 503."
+  echo "  !! $n schedule(s) exist; this project should have none"
+  aws scheduler list-schedules --query 'Schedules[].Name' --output text
 fi

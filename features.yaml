@@ -1,9 +1,13 @@
 # Shared feature configuration — pipelines.md step 0.4.
 #
-# THE contract between training (Pipeline 1, phases 4-6) and inference
-# (Pipeline 2). Both import this file. The single most common cause of
-# train/serve skew is the inference path computing a feature slightly
-# differently from the training path; pinning everything here is the defence.
+# The feature contract for the training pipeline: variable lists, their order,
+# the timezone, the label thresholds, and the split boundaries. Phase 4 derives
+# features from it and phase 6 trains against it, so the two cannot drift.
+#
+# It is published alongside the trained model because any future inference path
+# must build its feature vector identically — that is what makes a model
+# portable. That path is drawn in docs/live_inference.drawio and is NOT built;
+# nothing in this repository reads a live feed.
 #
 # Nothing in this file may be changed without retraining.
 
@@ -19,20 +23,10 @@ project:
   # post-COVID demand regime, and e-bikes present (README section 9).
   train_window_start: "2022-01-01"
 
-geo:
-  # PA State Plane South. All buffering and distance work happens here.
-  # The closure CSV export is EPSG:3857, where distances inflate ~1.29x at
-  # Philadelphia's latitude — buffering in Web Mercator gives silently wrong
-  # radii (pipelines.md 4.1).
-  projected_crs: "EPSG:2272"
-  geographic_crs: "EPSG:4326"
-  # Closure -> station association radius. A hyperparameter, not a constant:
-  # test sensitivity before trusting the closure arm (README section 9).
-  station_buffer_m: 150
-
-# Open-Meteo variable list. The historical-forecast API (training) and the
-# forecast API (inference) are both called with EXACTLY this list, in this
-# order. Adding a variable here without retraining breaks the contract.
+# Open-Meteo variable list, pinned in this order. Only the HISTORICAL forecast
+# API is called -- this project reads archives, never a live feed. The order is
+# fixed because any future inference path must build its vector identically;
+# that path is drawn in docs/live_inference.drawio and is not built.
 weather:
   hourly:
     - temperature_2m
@@ -71,6 +65,15 @@ labels:
 
 # Feature groups. The leakage audit (4.8) walks this list, and SHAP attribution
 # (6.7) is reported per group — the group names ARE the research deliverable.
+# Feature groups. The leakage audit (4.8) walks this list, and SHAP attribution
+# (6.7) is reported per group — the group names ARE the research deliverable.
+#
+# There is deliberately NO closure group. PGW publishes closures as bare text
+# addresses with no coordinates, and turning ~108 K of those into points needs a
+# street-name normaliser and a centerline range join that do not exist. Rather
+# than ship a closure feature that is mostly noise, the arm is cut: this project
+# measures TWO factors, weather and time, not three. Stated plainly here rather
+# than implied by a column of zeros.
 feature_groups:
   weather:
     - temperature_2m
@@ -91,14 +94,8 @@ feature_groups:
     - is_holiday
     - is_daylight
     - month
-  closure:
-    - n_closures_nearby
-    - closed_bike_lane_m
-    - has_closure
   station_static:
     - capacity
-    - bike_lane_density
-    - dist_to_centroid_m
   lag:
     - occupancy_lag_1h
     - net_flow_lag_1h

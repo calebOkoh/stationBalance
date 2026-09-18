@@ -1,13 +1,12 @@
 ###############################################################################
-# Lake layer — the two S3 zones the architecture draws, the read-only Glue
+# Storage layer — the two S3 buckets the architecture draws, the read-only Glue
 # catalog over them, the Athena workgroup that runs the QA gates, and the cost
 # guardrail.
 #
-# Two buckets exactly, matching docs/aws_architecture.drawio: `s3raw` carries
-# the immutable landing zone plus the intermediate Parquet, `s3gold` carries
-# the modelling table and everything produced from it. No third bucket: code,
-# logs and query results are prefixes on the gold bucket rather than resources
-# the diagram does not contain.
+# Two buckets, matching docs/pretrained_model.drawio: one holds the downloaded
+# archives and everything derived from them, the other holds the training
+# splits and the model artifacts. Code, logs and query results are prefixes on
+# the model bucket rather than a third bucket.
 ###############################################################################
 
 data "aws_caller_identity" "current" {}
@@ -15,24 +14,24 @@ data "aws_caller_identity" "current" {}
 locals {
   # Bucket names are globally unique, so the account id is the suffix that
   # makes this module re-deployable into a second account without edits.
-  raw_bucket  = "${var.service}-lake-${data.aws_caller_identity.current.account_id}"
-  gold_bucket = "${var.service}-gold-${data.aws_caller_identity.current.account_id}"
+  data_bucket  = "${var.service}-data-${data.aws_caller_identity.current.account_id}"
+  model_bucket = "${var.service}-model-${data.aws_caller_identity.current.account_id}"
 }
 
 ###############################################################################
-# Zone 1 — /raw (immutable), /bronze, /silver
+# Data bucket — raw/ (immutable), parsed/, clean/
 ###############################################################################
-resource "aws_s3_bucket" "raw" {
-  bucket = local.raw_bucket
+resource "aws_s3_bucket" "data" {
+  bucket = local.data_bucket
 
   tags = {
     step = "ingestion"
-    zone = "raw-bronze-silver"
+    zone = "raw-parsed-clean"
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "raw" {
-  bucket = aws_s3_bucket.raw.id
+resource "aws_s3_bucket_public_access_block" "data" {
+  bucket = aws_s3_bucket.data.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -40,8 +39,8 @@ resource "aws_s3_bucket_public_access_block" "raw" {
   restrict_public_buckets = true
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "raw" {
-  bucket = aws_s3_bucket.raw.id
+resource "aws_s3_bucket_server_side_encryption_configuration" "data" {
+  bucket = aws_s3_bucket.data.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -55,21 +54,21 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "raw" {
 # results reproduce even if Indego revises a file" (pipelines.md 1.1).
 # Versioning is what actually enforces that, since an accidental overwrite is
 # otherwise unrecoverable.
-resource "aws_s3_bucket_versioning" "raw" {
-  bucket = aws_s3_bucket.raw.id
+resource "aws_s3_bucket_versioning" "data" {
+  bucket = aws_s3_bucket.data.id
 
   versioning_configuration {
     status = "Enabled"
   }
 }
 
-resource "aws_s3_bucket_lifecycle_configuration" "raw" {
-  bucket     = aws_s3_bucket.raw.id
-  depends_on = [aws_s3_bucket_versioning.raw]
+resource "aws_s3_bucket_lifecycle_configuration" "data" {
+  bucket     = aws_s3_bucket.data.id
+  depends_on = [aws_s3_bucket_versioning.data]
 
-  # The poller writes ~288 objects/day forever. Intelligent-Tiering costs
-  # nothing to evaluate at this object size and stops the bill drifting as the
-  # log grows without bound (README section 3).
+  # Intelligent-Tiering costs nothing to evaluate at this object size, and
+  # raw/ is written once and then read a handful of times per pipeline run --
+  # exactly the access pattern it exists for.
   rule {
     id     = "raw-intelligent-tiering"
     status = "Enabled"
@@ -84,14 +83,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "raw" {
     }
   }
 
-  # bronze/ and silver/ are derived: any Spark re-run reproduces them, so old
+  # parsed/ and clean/ are derived: any Spark re-run reproduces them, so old
   # versions are pure cost.
   rule {
-    id     = "derived-expire-noncurrent"
+    id     = "parsed-expire-noncurrent"
     status = "Enabled"
 
     filter {
-      prefix = "bronze/"
+      prefix = "parsed/"
     }
 
     noncurrent_version_expiration {
@@ -100,11 +99,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "raw" {
   }
 
   rule {
-    id     = "silver-expire-noncurrent"
+    id     = "clean-expire-noncurrent"
     status = "Enabled"
 
     filter {
-      prefix = "silver/"
+      prefix = "clean/"
     }
 
     noncurrent_version_expiration {
@@ -125,19 +124,19 @@ resource "aws_s3_bucket_lifecycle_configuration" "raw" {
 }
 
 ###############################################################################
-# Zone 2 — /gold (modelling table) plus the artifacts produced from it
+# Model bucket — training/ (splits) plus the artifacts produced from them
 ###############################################################################
-resource "aws_s3_bucket" "gold" {
-  bucket = local.gold_bucket
+resource "aws_s3_bucket" "model" {
+  bucket = local.model_bucket
 
   tags = {
     step = "assembly"
-    zone = "gold"
+    zone = "training-models"
   }
 }
 
-resource "aws_s3_bucket_public_access_block" "gold" {
-  bucket = aws_s3_bucket.gold.id
+resource "aws_s3_bucket_public_access_block" "model" {
+  bucket = aws_s3_bucket.model.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -145,8 +144,8 @@ resource "aws_s3_bucket_public_access_block" "gold" {
   restrict_public_buckets = true
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "gold" {
-  bucket = aws_s3_bucket.gold.id
+resource "aws_s3_bucket_server_side_encryption_configuration" "model" {
+  bucket = aws_s3_bucket.model.id
 
   rule {
     apply_server_side_encryption_by_default {
@@ -159,17 +158,17 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "gold" {
 # Frozen splits and exported model bundles are the artifacts every reported
 # number is traceable to. Versioning is the cheap insurance against an
 # experiment overwriting the run that produced the deliverable.
-resource "aws_s3_bucket_versioning" "gold" {
-  bucket = aws_s3_bucket.gold.id
+resource "aws_s3_bucket_versioning" "model" {
+  bucket = aws_s3_bucket.model.id
 
   versioning_configuration {
     status = "Enabled"
   }
 }
 
-resource "aws_s3_bucket_lifecycle_configuration" "gold" {
-  bucket     = aws_s3_bucket.gold.id
-  depends_on = [aws_s3_bucket_versioning.gold]
+resource "aws_s3_bucket_lifecycle_configuration" "model" {
+  bucket     = aws_s3_bucket.model.id
+  depends_on = [aws_s3_bucket_versioning.model]
 
   # Athena result sets and EMR logs are debris. Neither is worth storing past
   # the run that produced it.
@@ -200,11 +199,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "gold" {
   }
 
   rule {
-    id     = "gold-expire-noncurrent"
+    id     = "training-expire-noncurrent"
     status = "Enabled"
 
     filter {
-      prefix = "gold/"
+      prefix = "training/"
     }
 
     noncurrent_version_expiration {

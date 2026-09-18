@@ -87,10 +87,10 @@ def put_bytes(bucket: str, key: str, body: bytes, content_type: str) -> None:
 def put_json_gz(bucket: str, key: str, payload) -> None:
     """Land a JSON document gzipped.
 
-    The poller writes ~288 objects/day and station_status is ~250 highly
-    repetitive records, so gzip is roughly a 10x saving on both storage and
-    the bytes Athena later scans. `.json.gz` is transparently readable by
-    Spark, so step 1.9 needs no special case.
+    The Open-Meteo responses are long runs of repetitive numbers, so gzip is
+    roughly a 10x saving on both storage and the bytes Spark later reads.
+    `.json.gz` is transparently readable by Spark, so phase 1 needs no special
+    case.
     """
     body = gzip.compress(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     S3.put_object(Bucket=bucket, Key=key, Body=body, ContentType="application/gzip")

@@ -17,31 +17,14 @@ variable "service" {
 }
 
 variable "log_retention_days" {
-  description = "CloudWatch log retention for the collector Lambdas"
+  description = "CloudWatch log retention for the ingest Lambda"
   type        = number
   default     = 30
 }
 
-variable "poll_interval_minutes" {
-  description = "station_status poll interval. 5 minutes is the value pipelines.md 0.5 pins; the feed's own ttl is ~60s, so this is already conservative."
-  type        = number
-  default     = 5
-}
 
-variable "enable_collectors" {
-  description = "Master switch for the three recurring schedules. The poller in particular should stay on -- its data cannot be backfilled."
-  type        = bool
-  default     = true
-}
-
-variable "raw_bucket_name" {
-  description = "Override the raw-zone bucket name. Defaults to the lake layer's convention; set it only when pointing this layer at a lake that was named differently."
-  type        = string
-  default     = null
-}
-
-variable "gold_bucket_name" {
-  description = "Override the gold bucket name. Same reasoning as raw_bucket_name."
+variable "data_bucket_name" {
+  description = "Override the data bucket name. Defaults to the storage layer's convention; set it only when pointing this layer at buckets named differently."
   type        = string
   default     = null
 }

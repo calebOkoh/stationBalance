@@ -10,7 +10,7 @@
 locals {
   # Declared here rather than as repeated inline blocks so the schema reads as
   # a list and the two tables stay visually comparable.
-  silver_trips_columns = [
+  clean_trips_columns = [
     { name = "trip_id", type = "bigint" },
     { name = "duration_s", type = "int" },
     { name = "start_time", type = "timestamp" },
@@ -22,7 +22,7 @@ locals {
     { name = "passholder_type", type = "string" },
   ]
 
-  gold_station_hour_columns = [
+  training_station_hour_columns = [
     { name = "station_id", type = "int" },
     { name = "hour_ts", type = "timestamp" },
     { name = "arr", type = "int" },
@@ -38,7 +38,7 @@ locals {
   ]
 }
 
-resource "aws_glue_catalog_database" "lake" {
+resource "aws_glue_catalog_database" "catalog" {
   name        = replace(var.service, "-", "_")
   description = "Indego station capacity lake. Hand-written DDL, no crawler."
 
@@ -49,9 +49,9 @@ resource "aws_glue_catalog_database" "lake" {
 
 # The conformed event log (pipelines.md 2.5). Every label-construction step
 # reads from here.
-resource "aws_glue_catalog_table" "silver_trips" {
-  name          = "silver_trips"
-  database_name = aws_glue_catalog_database.lake.name
+resource "aws_glue_catalog_table" "clean_trips" {
+  name          = "clean_trips"
+  database_name = aws_glue_catalog_database.catalog.name
   table_type    = "EXTERNAL_TABLE"
 
   parameters = {
@@ -71,7 +71,7 @@ resource "aws_glue_catalog_table" "silver_trips" {
   }
 
   storage_descriptor {
-    location      = "s3://${aws_s3_bucket.raw.id}/silver/trips/"
+    location      = "s3://${aws_s3_bucket.data.id}/clean/trips/"
     input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
     output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
 
@@ -80,7 +80,7 @@ resource "aws_glue_catalog_table" "silver_trips" {
     }
 
     dynamic "columns" {
-      for_each = local.silver_trips_columns
+      for_each = local.clean_trips_columns
       content {
         name = columns.value.name
         type = columns.value.type
@@ -92,9 +92,9 @@ resource "aws_glue_catalog_table" "silver_trips" {
 # The wide modelling table (pipelines.md 5.1) — the one artifact the training
 # job reads. Columns beyond the keys and labels are declared by the Spark
 # write, so only the stable spine is pinned here.
-resource "aws_glue_catalog_table" "gold_station_hour" {
-  name          = "gold_station_hour_features"
-  database_name = aws_glue_catalog_database.lake.name
+resource "aws_glue_catalog_table" "training_station_hour" {
+  name          = "training_station_hour_features"
+  database_name = aws_glue_catalog_database.catalog.name
   table_type    = "EXTERNAL_TABLE"
 
   parameters = {
@@ -104,17 +104,17 @@ resource "aws_glue_catalog_table" "gold_station_hour" {
   }
 
   partition_keys {
-    name = "year"
+    name = "part_year"
     type = "int"
   }
 
   partition_keys {
-    name = "month"
+    name = "part_month"
     type = "int"
   }
 
   storage_descriptor {
-    location      = "s3://${aws_s3_bucket.gold.id}/gold/station_hour_features/"
+    location      = "s3://${aws_s3_bucket.model.id}/training/station_hour_features/"
     input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
     output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
 
@@ -123,7 +123,7 @@ resource "aws_glue_catalog_table" "gold_station_hour" {
     }
 
     dynamic "columns" {
-      for_each = local.gold_station_hour_columns
+      for_each = local.training_station_hour_columns
       content {
         name = columns.value.name
         type = columns.value.type
@@ -152,7 +152,7 @@ resource "aws_athena_workgroup" "qa" {
     bytes_scanned_cutoff_per_query = 10 * 1024 * 1024 * 1024
 
     result_configuration {
-      output_location = "s3://${aws_s3_bucket.gold.id}/athena-results/"
+      output_location = "s3://${aws_s3_bucket.model.id}/athena-results/"
 
       encryption_configuration {
         encryption_option = "SSE_S3"
