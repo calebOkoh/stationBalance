@@ -62,7 +62,7 @@ Three constraints the training diagram exists to make explicit:
 | Nothing is on a schedule | Every run is attended. There is no EventBridge resource in the account, and `scripts/00_preflight.sh` asserts that |
 | The model is registered, not served | The deliverable is the bundle in the SageMaker Model Registry. No endpoint, no API, nothing warm |
 
-**Sizing and cost.** EMR Serverless at driver 4 vCPU / 16 GB, executors 4 × 4 vCPU, `preInitializedCapacity` **0** — ~$1–2 per pipeline run. SageMaker training on one `ml.m5.4xlarge`, ~$0.25 per run. At rest this is S3 storage and nothing else, well under $1/month. Every meaningful cost risk is something *left running*: a NAT Gateway ($32/mo), a managed MLflow tracking server (~$460/mo), or pre-initialised EMR capacity. None are provisioned.
+**Sizing and cost.** EMR Serverless at driver 4 vCPU / 14 GB and two executors at 4 vCPU / 14 GB, dynamic allocation off, `preInitializedCapacity` **0** — 12 vCPU and 42 GB, inside both the application cap and the account's 16 vCPU quota (L-D05C8A75), ~$1–2 per pipeline run. The sizing is passed explicitly in `scripts/20_run_phase.sh`; left to the image defaults, Spark requests executors past the cap and decorates every run with warnings that look like failures. SageMaker training on one `ml.m5.4xlarge`, ~$0.25 per run. At rest this is S3 storage and nothing else, well under $1/month. Every meaningful cost risk is something *left running*: a NAT Gateway ($32/mo), a managed MLflow tracking server (~$460/mo), or pre-initialised EMR capacity. None are provisioned.
 
 ---
 
@@ -70,22 +70,28 @@ Three constraints the training diagram exists to make explicit:
 
 State this explicitly, because it will be questioned.
 
-Figures below are **measured**, not estimated — trip counts derived from the published archive sizes on 2026-09-17 (see `indego_capacity_data_sources.csv`).
+Figures below are **measured from the landed data** on 2026-09-18 — counted by
+phases 1 and 2, not derived from archive sizes. The earlier estimates taken
+from `indego_capacity_data_sources.csv` are superseded; where they differ, the
+run is right.
 
 | Quantity | Measured |
 |---|---|
-| Trip records, 2022 Q1 – 2026 Q2 | **5.16 M** (18 quarterly archives, 107 MB zipped / ~680 MB CSV) |
-| Trip *events* (arrivals + departures) | ~10.3 M |
-| Stations | ~250 |
-| Hours in window | ~39,000 |
-| Station-hour modelling grid | **~10 M rows** (~1–2 GB Parquet at ~60 features) |
+| Trip records published, 2022 Q1 – 2026 Q2 | **5,307,135** (18 quarterly archives, 107 MB zipped / 700 MB CSV) |
+| Trip records after phase 2 | **5,096,494** (210,641 dropped, 3.97% — window, duration bounds, pseudo-station) |
+| Trip *events* (arrivals + departures) | **~10.2 M** |
+| Stations | **367** (368 published, minus `Virtual Station`) |
+| Hours in window | **41,323** |
+| Station-hour modelling grid | **~15.2 M rows** before the go-live filter (367 × 41,323) |
 | Total storage footprint | **~3–5 GB** |
 
-This is a **modest** volume. The entire pipeline fits in RAM on a single 16 GB machine.
+This is a **modest** volume. At ~22 features the grid is roughly 2–3 GB in
+memory, so the modelling table still fits on a single machine — the phase-6
+instance has 64 GB.
 
 Distributed processing is justified by:
 
-1. **Step 3.1** — a global sort-and-window over the entire trip history partitioned by `bike_id`. This is the genuine shuffle-heavy stage and the peak memory consumer. Note that 5.16 M rows is not, on its own, Spark-scale.
+1. **Step 3.1** — a global sort-and-window over the entire trip history partitioned by `bike_id`. This is the genuine shuffle-heavy stage and the peak memory consumer. Note that 5.1 M rows is not, on its own, Spark-scale.
 2. **The architectural requirement of the project itself.** This is the honest primary justification and should be stated as such.
 
 It is **not** justified by raw input size. Be honest about this rather than overstating the data volume — a reviewer who checks the numbers should find them conservative, not inflated.
@@ -148,7 +154,7 @@ Six phases, run in order, by hand.
 | Phase | Does | Watch out for |
 |---|---|---|
 | **1 · Land** | Trip ZIPs, station CSV, weather JSON → Parquet | Nothing is cleaned here; that is phase 2's job, so a bad filter rule can be fixed without re-downloading |
-| **2 · Conform** | Normalise schema, localise timestamps, filter, dedupe | DST breaks any naive local-time join; `Virtual Station` rows corrupt mass balance |
+| **2 · Conform** | Normalise schema, localise timestamps, filter, dedupe; conform the station table | DST breaks any naive local-time join. Timestamps are published `M/d/yyyy H:mm`, so an implicit `to_timestamp` nulls every row and the window filter then drops them **silently** — step 2.2 asserts the parse rate for exactly this. The trip archives carry **no station-name column**, so `Virtual Station` must be excluded by id sourced from the station table, not by name |
 | **3 · Labels** | Bike trajectories, rebalancing events, station-hour grid, `net_flow`, occupancy ledger | Must be a **single global pass** — partitioning by quarter injects a false rebalance every 3 months |
 | **4 · Features** | Weather join, calendar features, lags | The leakage audit is a hard stop, not a warning |
 | **5 · Assembly** | Wide table, **chronological** split, class weights | Never random-split — it leaks future weather and inflates metrics |
@@ -178,11 +184,17 @@ What a live inference path would have to honour — the identical feature list a
 
 The ledger diagnostics above check internal consistency; they do not check that the event-emission rules are *correct*. `tests/test_recovery.py` does, without external data: it injects synthetic van moves with known station pairs and timings, runs the **actual** 3.2 / 3.3 functions imported from `pipelines/labels/job.py`, and asserts exact recovery of every injected move. It also asserts that two trips either side of a quarter boundary at the same station produce **no** event — the specific failure a per-quarter pass would introduce.
 
-It needs Spark, so it skips in a plain Python environment. **That skip is not a pass.** Run it before trusting phase 3 output:
+It needs Spark, so it skips in a plain Python environment. **That skip is not a pass.** Run it on the cluster, between `conform` and `labels`:
 
 ```bash
-spark-submit tests/test_recovery.py
+scripts/25_run_gate.sh
 ```
+
+That submits the test to the same EMR Serverless application the phases use, so
+it validates against the Spark version phase 3 will actually run on rather than
+a local approximation. The test exits non-zero on failure, so a failed gate is a
+`FAILED` job run. `spark-submit tests/test_recovery.py` still works from a
+checkout that has Spark and a JVM locally.
 
 This validates the emission **logic**. The 6h / 72h / 30d thresholds are **priors** and are not validated: doing so needs a trip archive overlapping a window of recorded live dock counts, and this project records none. **Tier 2 therefore ships diagnostically consistent but without a numeric error bar, and is reported that way** — `metrics.json` says so explicitly. Tier-1 `net_flow` is counted rather than reconstructed, so training, evaluation and attribution are unaffected.
 
@@ -197,7 +209,9 @@ This validates the emission **logic**. The 6h / 72h / 30d thresholds are **prior
 ## 7. Highest-Risk Items
 
 1. **Step 3.1 — the global `bike_id` pass.** The one stage where a partitioning mistake produces plausible-looking but wrong output that no downstream check will obviously catch. Mitigated by the recovery test in §6, which is why that test is a gate.
-2. **Schema drift across quarters.** 18 quarterly archives with drifting column names. The mapping in `pipelines/conform/job.py` is explicit and **asserted** — an unrecognised schema stops the job rather than silently nulling a column. Expect to add aliases on the first run.
+2. **Schema drift across quarters — names *and* values.** 18 quarterly archives with drifting column names. The mapping in `pipelines/conform/job.py` is explicit and **asserted** — an unrecognised schema stops the job rather than silently nulling a column. Expect to add aliases on the first run; the 2026-07-15 station table needed one (`Day of Go_live_date`).
+
+   Column names resolving correctly is **not** sufficient. On the first run every name mapped and 100% of rows were still dropped, because the published timestamp format is `M/d/yyyy H:mm` and an implicit `to_timestamp` returns NULL for it — which the window filter then discards without comment, leaving an empty table and a green job. `assert_timestamps_parsed` in phase 2 is the mitigation and hard-fails above a 1% unparseable rate, the same way the leakage audit hard-fails in 4.8.
 3. **Tier-2 occupancy is unvalidated.** The level is a lower bound and the gap thresholds are stated priors. This is fine for the deliverable — attribution rests on Tier-1 — but any use of `pct_full` or `is_empty` as a measurement rather than an estimate is unsupported.
 4. **Two factors, not three.** The closure arm is cut (§1). If the attribution result is weaker than hoped, the absent third factor is a real candidate explanation and should be named as one.
 
@@ -231,6 +245,7 @@ This validates the emission **logic**. The 6h / 72h / 30d thresholds are **prior
 │   ├── assembly/                       # Phase 5
 │   └── training/                       # Phase 6
 ├── scripts/                            # The attended running order, numbered
+│   └── 25_run_gate.sh                  # The phase-3 recovery GATE, on the cluster
 └── tests/
     ├── test_recovery.py                # The 3.2/3.3 recovery GATE (needs Spark)
     └── test_calendarfeat.py            # Shared calendar features
@@ -255,6 +270,7 @@ scripts/00_preflight.sh                  # did the deploy land?
 scripts/10_ingest.sh                     # download trips, stations, weather
 scripts/20_run_phase.sh land             # archives → Parquet
 scripts/20_run_phase.sh conform          # normalise, filter, dedupe
+scripts/25_run_gate.sh                   # GATE: 3.2/3.3 recovery, before labels
 scripts/20_run_phase.sh labels           # bike_id trajectories → net_flow
 scripts/20_run_phase.sh features         # weather + calendar + lags
 scripts/20_run_phase.sh assembly         # wide table, chronological split
@@ -263,7 +279,8 @@ scripts/40_publish_model.sh <job-name>   # register the model
 ```
 
 Roughly 2–3 hours end to end, most of it unattended. `scripts/run_tests.sh`
-runs the unit tests; the recovery gate needs `spark-submit` (§6).
+runs the unit tests; the recovery gate runs on the cluster via
+`scripts/25_run_gate.sh` (§6).
 
 ---
 

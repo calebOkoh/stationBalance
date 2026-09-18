@@ -38,6 +38,19 @@ locals {
   ]
 }
 
+# EMR's Glue-backed Hive client verifies that `default` exists on every
+# spark.sql() call and tries to CREATE it when it does not. A fresh account has
+# no `default` database, so the alternative to declaring it here is granting the
+# job role glue:CreateDatabase on the entire catalog -- a far broader permission
+# than a project that owns one database should hold.
+#
+# Declared in this layer because this layer owns the catalog. It stays empty:
+# every table this project reads lives in the database below.
+resource "aws_glue_catalog_database" "default" {
+  name        = "default"
+  description = "Empty. Required by the EMR Serverless Glue Hive client, which probes for it on every spark.sql() call."
+}
+
 resource "aws_glue_catalog_database" "catalog" {
   name        = replace(var.service, "-", "_")
   description = "Indego station capacity lake. Hand-written DDL, no crawler."

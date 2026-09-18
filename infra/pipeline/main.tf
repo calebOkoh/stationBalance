@@ -177,10 +177,20 @@ data "aws_iam_policy_document" "emr" {
       "glue:GetPartition", "glue:GetPartitions",
       "glue:BatchCreatePartition", "glue:CreatePartition",
       "glue:UpdatePartition", "glue:BatchGetPartition",
+      # MSCK REPAIR TABLE rewrites the table's partition metadata, which Glue
+      # authorises as UpdateTable rather than as a partition action. Still no
+      # Create or Delete: the DDL stays Terraform-owned, and a job can register
+      # partitions on an existing table but cannot add or drop one.
+      "glue:UpdateTable",
     ]
     resources = [
       "arn:${data.aws_partition.current.partition}:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:catalog",
       "arn:${data.aws_partition.current.partition}:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:database/${replace(var.service, "-", "_")}",
+      # AWSGlueDataCatalogHiveClientFactory verifies that `default` exists on
+      # EVERY spark.sql() call, before it looks at the database the query names.
+      # Without GetDatabase on it, every phase that touches SQL -- conform,
+      # labels, features, assembly -- dies on a database it never reads.
+      "arn:${data.aws_partition.current.partition}:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:database/default",
       "arn:${data.aws_partition.current.partition}:glue:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/${replace(var.service, "-", "_")}/*",
     ]
   }

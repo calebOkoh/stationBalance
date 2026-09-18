@@ -48,6 +48,20 @@ def test_weekend_flag():
     assert cf.calendar_features(datetime(2026, 3, 17, 12))["is_weekend"] == 0.0   # Tuesday
 
 
+def test_spark_dayofweek_translation_matches_python_weekday():
+    """Phase 4 derives dow natively as (F.dayofweek(ts) + 5) % 7.
+
+    Spark numbers 1=Sunday..7=Saturday; calendarfeat uses Python's weekday(),
+    0=Monday..6=Sunday. This asserts the conversion arithmetic the Spark
+    expression relies on, which is the one part of the native re-expression
+    that is not self-evidently correct (.claude/decisions.md).
+    """
+    for day in range(1, 8):  # 2026-03-15 is a Sunday, so 15..21 covers a week
+        d = date(2026, 3, 14 + day)
+        spark_dow = (d.weekday() + 1) % 7 + 1     # Python -> Spark numbering
+        assert (spark_dow + 5) % 7 == d.weekday(), d
+
+
 def test_every_declared_feature_is_produced():
     feats = cf.calendar_features(datetime(2026, 3, 17, 9))
     assert set(feats) == set(cf.FEATURE_NAMES)

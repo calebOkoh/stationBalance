@@ -107,7 +107,10 @@ def land_stations(spark, zones) -> int:
 
     df = raw.select(
         pick("station_id", "station", "id").cast("int").alias("station_id"),
-        pick("go_live_date", "golivedate", "go_live").alias("go_live_raw"),
+        # "Day of Go_live_date" is what the 2026-07-15 vintage publishes -- a
+        # Tableau export header, not a rename of the underlying field.
+        pick("go_live_date", "golivedate", "go_live",
+             "day_of_go_live_date").alias("go_live_raw"),
         pick("station_name", "name").alias("station_name"),
     ).withColumn(
         # Published as M/D/YYYY in some vintages and YYYY-MM-DD in others.
@@ -177,7 +180,13 @@ def land_weather(spark, zones, bucket, cfg) -> int:
             row = {"point_name": point, "hour_ts": ts}
             for v in variables:
                 series = hourly.get(v) or []
-                row[v] = series[i] if i < len(series) else None
+                value = series[i] if i < len(series) else None
+                # Open-Meteo returns whole numbers unquoted, so a 100% humidity
+                # or a 0 mm precipitation arrives as a Python int. DoubleType
+                # rejects int outright rather than widening it, and which
+                # variables come back integral varies by hour -- so coerce here
+                # rather than per-variable.
+                row[v] = None if value is None else float(value)
 
             day = ts[:10]
             if day in sun:

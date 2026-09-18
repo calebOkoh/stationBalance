@@ -12,6 +12,7 @@ wrong.
 
 from __future__ import annotations
 
+import math
 import sys
 
 from pyspark.sql import Window
@@ -45,6 +46,66 @@ def weather_features(spark, zones, cfg):
 
     # Tiny table -- a few tens of thousands of rows -- so it broadcasts.
     return F.broadcast(weather)
+
+
+def calendar_columns(df, calendarfeat, ts_col: str = "hour_ts"):
+    """4.6 -- the temporal arm, as native Spark expressions.
+
+    This used to register `calendarfeat.calendar_features` as a Python UDF and
+    call it once per row. At the measured grid size that is ~15 M round trips
+    through the Python worker to compute six sines and a lookup, and it was the
+    slowest stage in the pipeline for no analytical reason.
+
+    The rule this keeps: Spark may re-express the ARITHMETIC, but it must not
+    re-implement the CALENDAR. The sin/cos formulas are closed-form and have
+    nothing to drift, so they are safe as column expressions. The holiday rules
+    are not -- so `us_federal_holidays()` remains the single source of truth in
+    calendarfeat.py, and this function calls it, once per year in the window,
+    on the driver. That is what keeps the train/serve contract in README
+    section 5 real: a future inference path still imports the same file.
+
+    ~1,722 distinct dates against ~15 M rows, so the holiday set broadcasts.
+    """
+    ts = F.col(ts_col)
+
+    bounds = df.agg(F.min(ts_col).alias("lo"), F.max(ts_col).alias("hi")).first()
+    years = range(bounds["lo"].year, bounds["hi"].year + 1)
+    holidays = sorted(
+        d.isoformat() for y in years for d in calendarfeat.us_federal_holidays(y)
+    )
+    print(f"[4.6] {len(holidays)} federal holiday dates across {bounds['lo'].year}"
+          f"-{bounds['hi'].year}, broadcast as a literal set")
+
+    # Spark's dayofweek is 1=Sunday; calendarfeat uses Python's weekday(),
+    # 0=Monday. Converted here so both implementations agree by construction.
+    dow = (F.dayofweek(ts) + F.lit(5)) % F.lit(7)
+    hour = F.hour(ts)
+    tau = F.lit(2.0 * math.pi)
+
+    out = (
+        df
+        .withColumn("hour_sin", F.sin(tau * hour / F.lit(24.0)))
+        .withColumn("hour_cos", F.cos(tau * hour / F.lit(24.0)))
+        .withColumn("dow_sin", F.sin(tau * dow / F.lit(7.0)))
+        .withColumn("dow_cos", F.cos(tau * dow / F.lit(7.0)))
+        .withColumn("is_weekend", F.when(dow >= F.lit(5), 1.0).otherwise(0.0))
+        .withColumn("is_holiday",
+                    F.when(F.date_format(ts, "yyyy-MM-dd").isin(holidays), 1.0)
+                     .otherwise(0.0))
+        .withColumn("month", F.month(ts).cast("double"))
+    )
+
+    # calendarfeat still owns the feature LIST, so a feature added there and
+    # forgotten here is a hard stop rather than a column that silently is not
+    # built.
+    missing = [n for n in calendarfeat.FEATURE_NAMES if n not in out.columns]
+    if missing:
+        raise SystemExit(
+            f"calendarfeat declares {missing} but calendar_columns() does not "
+            "build them. Add the expression here, or move the feature back to "
+            "the shared function."
+        )
+    return out
 
 
 def leakage_audit(df, cfg) -> None:
@@ -87,9 +148,10 @@ def main() -> int:
     cfg = load_features(spark, args.features)
     zones = Zones(args.data_bucket, args.model_bucket)
 
-    # calendarfeat is the SAME module the inference Lambda imports, shipped via
-    # --py-files. That is what makes 4.6 a shared implementation rather than a
-    # shared intention.
+    # calendarfeat is the SAME module a future inference path would import,
+    # shipped via --py-files. Phase 4 calls its holiday rules rather than
+    # restating them, which is what makes 4.6 a shared implementation rather
+    # than a shared intention.
     import calendarfeat
 
     labels = spark.read.parquet(f"{zones.clean}/station_hour_labels/")
@@ -97,17 +159,9 @@ def main() -> int:
     # 4.5 -- weather, joined on the hour alone (one grid point for the city).
     df = labels.join(weather_features(spark, zones, cfg), ["hour_ts"], "left")
 
-    # 4.6 -- calendar. Registered as a UDF over the shared function so training
-    # and serving cannot diverge.
-    from pyspark.sql.types import DoubleType, StructField, StructType
-
-    schema = StructType([StructField(n, DoubleType()) for n in calendarfeat.FEATURE_NAMES])
-    cal_udf = F.udf(lambda ts: calendarfeat.calendar_features(ts) if ts else None, schema)
-
-    df = df.withColumn("_cal", cal_udf(F.col("hour_ts")))
-    for name in calendarfeat.FEATURE_NAMES:
-        df = df.withColumn(name, F.col(f"_cal.{name}"))
-    df = df.drop("_cal")
+    # 4.6 -- calendar. Native expressions over the shared holiday rules; see
+    # calendar_columns() for why it is split that way.
+    df = calendar_columns(df, calendarfeat)
 
     # 4.7 -- lag and rolling. Legitimate: these look only backwards, so any
     # future consumer could compute them from data it already has. Anything

@@ -19,6 +19,7 @@ Run:  python3 tests/test_recovery.py          (skips cleanly without pyspark)
 
 from __future__ import annotations
 
+import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -198,12 +199,18 @@ def test_recent_last_trip_is_not_retired(spark):
 
 
 def main() -> int:
-    spark = (SparkSession.builder
-             .appName("station-balance/recovery-test")
-             .master("local[2]")
-             .config("spark.sql.session.timeZone", "America/New_York")
-             .config("spark.sql.shuffle.partitions", "4")
-             .getOrCreate())
+    # local[2] when run from a checkout that has Spark; whatever the cluster
+    # set when submitted through scripts/25_run_gate.sh. Pinning local[2]
+    # unconditionally would force the whole gate into the driver container on
+    # EMR Serverless, which is exactly the environment the gate exists to
+    # validate against.
+    builder = (SparkSession.builder
+               .appName("station-balance/recovery-test")
+               .config("spark.sql.session.timeZone", "America/New_York")
+               .config("spark.sql.shuffle.partitions", "4"))
+    if not SparkSession.getActiveSession() and "SPARK_APPLICATION_ID" not in os.environ:
+        builder = builder.master(os.environ.get("RECOVERY_TEST_MASTER", "local[2]"))
+    spark = builder.getOrCreate()
     spark.sparkContext.setLogLevel("ERROR")
 
     failures = 0

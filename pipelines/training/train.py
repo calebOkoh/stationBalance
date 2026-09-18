@@ -38,7 +38,11 @@ TRAIN_DIR = Path(os.environ.get("SM_CHANNEL_TRAIN", "/opt/ml/input/data/train"))
 VAL_DIR = Path(os.environ.get("SM_CHANNEL_VALIDATION", "/opt/ml/input/data/validation"))
 TEST_DIR = Path(os.environ.get("SM_CHANNEL_TEST", "/opt/ml/input/data/test"))
 MODEL_DIR = Path(os.environ.get("SM_MODEL_DIR", "/opt/ml/model"))
-SOURCE_DIR = Path(os.environ.get("SM_MODULE_DIR", ".")).parent
+# The directory this file was extracted into -- /opt/ml/code under SageMaker
+# script mode, which is where features.json from the tarball lands beside it.
+# NOT SM_MODULE_DIR: that holds the S3 URI of the submit directory, so deriving
+# a local path from it resolves to "s3:/bucket/code" and every read fails.
+SOURCE_DIR = Path(__file__).resolve().parent
 
 
 def load_split(path: Path) -> pd.DataFrame:

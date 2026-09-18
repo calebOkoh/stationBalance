@@ -6,6 +6,14 @@
 # fusing them would re-run the global bike_id sort on every feature experiment
 # (.claude/decisions.md).
 #
+# Sizing is passed EXPLICITLY. Without it Spark runs on the image defaults with
+# dynamic allocation on, keeps asking for executors past the application's
+# maximumCapacity, and every job summary is decorated with
+# ApplicationMaxCapacityExceededException warnings that look like failures and
+# are not. One driver plus two executors at 4 vCPU / 14 GB per container is
+# 12 vCPU and 42 GB -- inside both the application cap and the account's
+# 16 vCPU EMR Serverless quota (L-D05C8A75).
+#
 # Usage:  ./20_run_phase.sh land|conform|labels|features|assembly
 source "$(dirname "${BASH_SOURCE[0]}")/_env.sh"
 
@@ -45,7 +53,7 @@ JOB_ID="$(aws emr-serverless start-job-run \
         \"--glue-database\", \"$GLUE_DB\",
         \"--features\", \"$CODE_URI/features.json\"
       ],
-      \"sparkSubmitParameters\": \"--conf spark.archives= --py-files $CODE_URI/pipelines/calendarfeat.py,$CODE_URI/pipelines/lib.py --conf spark.sql.session.timeZone=America/New_York --conf spark.hadoop.hive.metastore.client.factory.class=com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory\"
+      \"sparkSubmitParameters\": \"--conf spark.archives= --py-files $CODE_URI/pipelines/calendarfeat.py,$CODE_URI/pipelines/lib.py --conf spark.driver.cores=4 --conf spark.driver.memory=12g --conf spark.driver.memoryOverhead=2g --conf spark.executor.cores=4 --conf spark.executor.memory=12g --conf spark.executor.memoryOverhead=2g --conf spark.executor.instances=2 --conf spark.dynamicAllocation.enabled=false --conf spark.sql.session.timeZone=America/New_York --conf spark.hadoop.hive.metastore.client.factory.class=com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory\"
     }
   }" \
   --configuration-overrides "{

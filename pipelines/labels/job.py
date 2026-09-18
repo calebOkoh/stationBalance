@@ -143,7 +143,8 @@ def station_hour_grid(spark, stations, trips):
     periods -- which is precisely the regime the stockout question lives in.
 
     Filtered by go-live date so a station is not scored as zero-demand for
-    years before it existed.
+    years before it existed. `Virtual Station` is already gone -- phase 2 drops
+    it from the station table, not just from the trips.
     """
     bounds = trips.select(
         F.date_trunc("hour", F.min("start_time")).alias("t0"),
@@ -263,7 +264,10 @@ def main() -> int:
     zones = Zones(args.data_bucket, args.model_bucket)
 
     trips = spark.read.parquet(f"{zones.clean}/trips/")
-    stations = spark.read.parquet(f"{zones.parsed}/stations/")
+    # clean/, not parsed/: the station table has been through phase 2, which is
+    # what drops `Virtual Station`. Reading parsed/ here would put the
+    # pseudo-station back into the grid below.
+    stations = spark.read.parquet(f"{zones.clean}/stations/")
 
     window_end = trips.agg(F.max("end_time")).first()[0]
     print(f"[labels] window ends {window_end}")
@@ -331,11 +335,25 @@ def main() -> int:
 
     ledger_diagnostics(labelled, events, cfg)
 
+    # Cast to the types the Glue DDL publishes, rather than letting Spark's
+    # inference decide. Parquet is self-describing so Spark reads either way,
+    # but ATHENA reads the DDL -- and a bigint column declared int is not an
+    # error there, it is a wrong number in a QA gate. The catalog is the
+    # contract; this select is where the job conforms to it.
     out = (
         labelled.select(
-            "station_id", "hour_ts", "arr", "dep", "reb_in", "reb_out",
-            "net_flow", "occupancy", "capacity", "pct_full",
-            "is_empty", "is_full",
+            F.col("station_id").cast("int").alias("station_id"),
+            F.col("hour_ts"),
+            F.col("arr").cast("int").alias("arr"),
+            F.col("dep").cast("int").alias("dep"),
+            F.col("reb_in").cast("int").alias("reb_in"),
+            F.col("reb_out").cast("int").alias("reb_out"),
+            F.col("net_flow").cast("int").alias("net_flow"),
+            F.col("occupancy").cast("double").alias("occupancy"),
+            F.col("capacity").cast("int").alias("capacity"),
+            F.col("pct_full").cast("double").alias("pct_full"),
+            F.col("is_empty"),
+            F.col("is_full"),
         )
         # Named part_* so the partition column cannot shadow the `month`
         # FEATURE that calendarfeat derives. Same value, different job: one is
