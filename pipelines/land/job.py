@@ -62,9 +62,27 @@ def land_trips(spark, zones, bucket) -> int:
     # Read back as text-typed columns. Casting is phase 2's job -- doing it here
     # would silently null a value whose format changed between quarters, and
     # that is exactly the drift phase 2 exists to catch explicitly.
-    df = spark.read.option("header", True).csv(f"{zones.parsed}/_trips_csv/*/*/*.csv")
+    #
+    # recursiveFileLookup rather than a glob: the staged keys nest
+    # year=/quarter=/<archive>/<file>.csv, and a fixed-depth glob silently
+    # matches nothing the moment that shape changes. It also switches off
+    # partition inference, which is wanted -- year/month are re-derived from
+    # the parsed timestamps later, not trusted from a path.
+    df = (spark.read
+          .option("header", True)
+          .option("recursiveFileLookup", "true")
+          .csv(f"{zones.parsed}/_trips_csv/"))
+
+    rows = df.count()
+    if rows == 0:
+        raise SystemExit(
+            f"staged {staged} CSV members but read 0 rows from "
+            f"{zones.parsed}/_trips_csv/ -- the archives are present but "
+            "unreadable, which is a different problem from them being absent"
+        )
+
     df.write.mode("overwrite").parquet(f"{zones.parsed}/trips/")
-    print(f"[land] trips: {staged} CSV members -> parsed/trips/")
+    print(f"[land] trips: {staged} CSV members, {rows:,} rows -> parsed/trips/")
     return staged
 
 

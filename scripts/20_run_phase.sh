@@ -30,7 +30,6 @@ echo "==> syncing job code to $CODE_URI"
 aws s3 sync "$PROJECT_ROOT/pipelines" "$CODE_URI/pipelines" --delete --exclude '__pycache__/*'
 # features.json is written by the storage layer from features.yaml via
 # yamldecode, so nothing here needs a YAML parser.
-aws s3 cp "$PROJECT_ROOT/src/lambdas/common/calendarfeat.py" "$CODE_URI/pipelines/calendarfeat.py"
 
 echo "==> submitting phase '$PHASE'"
 JOB_ID="$(aws emr-serverless start-job-run \

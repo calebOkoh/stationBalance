@@ -4,12 +4,6 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "aws_profile" {
-  description = "Named AWS profile used for this layer. Must be able to create IAM roles and attach policies."
-  type        = string
-  default     = "coa-dev"
-}
-
 variable "service" {
   description = "Value of the `service` tag applied to every taggable resource in the project"
   type        = string

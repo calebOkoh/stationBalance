@@ -54,11 +54,35 @@ resource "aws_emrserverless_application" "spark" {
     enabled = true
   }
 
+  # EMR Serverless populates this itself on creation. Declaring it explicitly
+  # so Terraform does not try to REMOVE it on the next apply -- an application
+  # in STARTED state rejects that, and the error names maximumCapacity as
+  # updatable, which sends you looking at the wrong attribute.
+  #
+  # One concurrent run is the honest number: the phases are sequential and run
+  # by hand, so anything higher only lets a mistyped second submit compete for
+  # the same vCPU quota.
+  scheduler_configuration {
+    max_concurrent_runs   = 1
+    queue_timeout_minutes = 360
+  }
+
   # A hard ceiling, not a target. Phases 2-5 operate on a ~10 M-row grid that
   # fits in memory; this exists so a runaway job cannot scale into real money.
+  #
+  # Capped at the account's concurrent-vCPU quota. A maximumCapacity above the
+  # quota is accepted by the API and then fails at executor allocation, so the
+  # min() is what turns a mid-job crash into a config that simply fits.
   maximum_capacity {
-    cpu    = "${(var.executor_count + 1) * 4} vCPU"
-    memory = "${(var.executor_count + 1) * 16} GB"
+    cpu    = "${min((var.executor_count + 1) * 4, var.max_concurrent_vcpu)} vCPU"
+    memory = "${min((var.executor_count + 1) * 16, var.max_concurrent_vcpu * 4)} GB"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = (var.executor_count + 1) * 4 <= var.max_concurrent_vcpu
+      error_message = "One driver plus ${var.executor_count} executors at 4 vCPU each needs ${(var.executor_count + 1) * 4} vCPU, above the account quota of ${var.max_concurrent_vcpu}. Lower executor_count, or raise quota L-D05C8A75 and set max_concurrent_vcpu to match."
+    }
   }
 
   tags = {

@@ -4,12 +4,6 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
-variable "aws_profile" {
-  description = "Named AWS profile used for this layer. Must be able to create IAM roles and attach policies."
-  type        = string
-  default     = "coa-dev"
-}
-
 variable "service" {
   description = "Value of the `service` tag applied to every taggable resource in the project"
   type        = string
@@ -47,9 +41,15 @@ variable "executor_memory" {
 }
 
 variable "executor_count" {
-  description = "Maximum concurrent executors. README section 2 sizes this at 4."
+  description = "Maximum concurrent executors. Bounded by max_concurrent_vcpu: one driver plus this many executors, at 4 vCPU each, must fit inside the account quota."
   type        = number
-  default     = 4
+  default     = 3
+}
+
+variable "max_concurrent_vcpu" {
+  description = "The account's EMR Serverless 'Max concurrent vCPUs per account' quota (L-D05C8A75). Default for a new account is 16. Exceeding it does NOT fail at apply time -- the application is created happily and then every job dies minutes in with ServiceQuotaExceededException while requesting executors, which is a far more expensive way to find out."
+  type        = number
+  default     = 16
 }
 
 variable "training_instance_type" {

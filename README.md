@@ -241,8 +241,11 @@ This validates the emission **logic**. The 6h / 72h / 30d thresholds are **prior
 `infra/README.md` has the detail. The short version:
 
 ```bash
-cd infra && ./deploy-all.sh          # storage → ingestion → pipeline
+cd infra && ./deploy-all.sh --profile <your-aws-profile>
 ```
+
+The profile is an input — pass `--profile`, export `AWS_PROFILE`, or write it
+once into `infra/deploy.env`. There is no default and no hardcoded name.
 
 Nothing starts running — there is no schedule in this project. Drive the
 phases by hand:

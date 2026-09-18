@@ -107,10 +107,45 @@ and 100% actual. Set `budget_alert_email` or the notifications are skipped.
 
 | Variable | Default | Why you would change it |
 |---|---|---|
-| `aws_profile` | `coa-dev` | Must be able to create IAM roles **and attach policies** |
 | `aws_region` | `us-east-1` | Single-region; there is no cross-region path |
 | `budget_alert_email` | `""` | Empty creates the budget but no notification |
 | `data_bucket_name` / `model_bucket_name` | `null` | Point a layer at buckets named differently |
+
+## Credentials
+
+The AWS profile is an **input**, not a constant. It is set in one place and
+read from there by every script:
+
+```bash
+./deploy-all.sh --profile coa-dev-user      # explicit, per run
+AWS_PROFILE=coa-dev-user ./deploy-all.sh    # from the environment
+cp deploy.env.example deploy.env            # persists across runs
+```
+
+Resolution order is flag → environment → `infra/deploy.env`, and there is
+**no default**. A default is how a stale profile name ends up baked into six
+files and fails at provider init months later.
+
+Nothing else knows the name. No Terraform variable, no provider block, no
+script. In particular there is deliberately **no `profile` argument on the
+provider**: the AWS provider's `profile` takes precedence over `AWS_PROFILE`,
+so setting it there would silently override whatever you passed and fail with
+`failed to get shared config profile` if the pinned name did not exist.
+
+`infra/_common.sh` does the resolution and every deploy script sources it;
+`scripts/_env.sh` reads the same `deploy.env` so the numbered scripts agree.
+`deploy.env` is gitignored.
+
+### The identity needs IAM rights
+
+The apply creates three roles and four policies, and a role with no permissions
+is useless to Lambda, EMR Serverless and SageMaker.
+`preflight-credentials.sh` runs before any apply — from a single layer script
+as well as `deploy-all.sh` — and checks the profile resolves, authenticates,
+and holds `iam:CreateRole`, `iam:PutRolePolicy`, `iam:AttachRolePolicy` and
+`iam:PassRole`. A missing or under-privileged credential fails in two seconds
+with an actionable message, rather than halfway through an apply leaving
+half-built roles behind.
 
 ## State
 

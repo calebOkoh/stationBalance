@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 1 -- drives the ingest Lambda through each source, in order.
+# Downloads the historical archives, one ingest-Lambda task at a time.
 #
 # Every task is idempotent: /raw is immutable, so anything already landed is
 # skipped rather than re-fetched (pipelines.md 1.1). Re-run this freely.
@@ -10,9 +10,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/_env.sh"
 FUNCTION="$(tf_output ingestion ingest_function_name)"
 TASKS=("$@")
 if [[ ${#TASKS[@]} -eq 0 ]]; then
-  # Order matters only in that `stations` supplies the go-live dates phase 3
-  # needs; the rest are independent.
-  TASKS=(stations station_info trips closures_bulk closures geo weather)
+  # Independent of each other; `stations` first only because it is the
+  # fastest check that the Lambda and its permissions work.
+  TASKS=(stations trips weather)
 fi
 
 for task in "${TASKS[@]}"; do
@@ -42,5 +42,5 @@ for task in "${TASKS[@]}"; do
 done
 
 echo
-echo "Phase 1 done. Historical closures still need the one-time PGW pull:"
-echo "  python3 scripts/pgw_backfill.py"
+echo "Downloads complete. Convert them to Parquet with:"
+echo "  scripts/20_run_phase.sh land"

@@ -9,7 +9,10 @@ set -euo pipefail
 # buckets by hand first if you genuinely mean it.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export AWS_PROFILE="${AWS_PROFILE:-coa-dev}"
+# Resolves AWS_PROFILE and populates TF_ARGS with everything else. The profile
+# name lives in your environment or infra/deploy.env -- never in this file.
+# shellcheck source=_common.sh
+source "$SCRIPT_DIR/_common.sh" "$@"
 
 echo "This destroys the station-balance infrastructure in:"
 aws sts get-caller-identity --query 'Account' --output text
@@ -22,5 +25,5 @@ fi
 
 for layer in pipeline ingestion storage; do
   echo "==> destroying $layer"
-  terraform -chdir="$SCRIPT_DIR/$layer" destroy -input=false "$@"
+  terraform -chdir="$SCRIPT_DIR/$layer" destroy -input=false "${TF_ARGS[@]}"
 done

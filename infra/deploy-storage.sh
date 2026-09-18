@@ -12,16 +12,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 LAYER_DIR="$SCRIPT_DIR/storage"
 
-# Override by exporting AWS_PROFILE yourself. The profile must be able to
-# create IAM roles AND attach policies to them -- the deploy fails at the first
-# aws_iam_role_policy otherwise.
-export AWS_PROFILE="${AWS_PROFILE:-coa-dev}"
+# Resolves AWS_PROFILE and populates TF_ARGS with everything else. The profile
+# name lives in your environment or infra/deploy.env -- never in this file.
+PREFLIGHT_LAYERS=storage
+# shellcheck source=_common.sh
+source "$SCRIPT_DIR/_common.sh" "$@"
 
 echo "==> terraform init (storage)"
 terraform -chdir="$LAYER_DIR" init -input=false
 
 echo "==> terraform apply (storage)"
-terraform -chdir="$LAYER_DIR" apply -input=false "$@"
+terraform -chdir="$LAYER_DIR" apply -input=false "${TF_ARGS[@]}"
 
 echo
 echo "Storage ready:"

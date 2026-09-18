@@ -21,9 +21,11 @@ aws s3 ls "s3://$MODEL_BUCKET/" >/dev/null && echo "  model $MODEL_BUCKET  OK"
 
 echo
 echo "==> feature contract published"
-aws s3 ls "s3://$MODEL_BUCKET/code/features.json" >/dev/null \
-  && echo "  features.json OK" \
-  || echo "  !! missing — re-run infra/deploy-storage.sh"
+if aws s3 ls "s3://$MODEL_BUCKET/code/features.json" >/dev/null 2>&1; then
+  echo "  features.json OK"
+else
+  echo "  !! missing — re-run infra/deploy-storage.sh"
+fi
 
 echo
 echo "==> EMR Serverless application"
@@ -38,8 +40,10 @@ aws lambda get-function-configuration --function-name "$INGEST" \
 echo
 echo "==> what has been downloaded so far"
 for prefix in trips stations weather; do
-  n="$(aws s3 ls "s3://$DATA_BUCKET/raw/$prefix/" --recursive 2>/dev/null | wc -l | tr -d ' ')"
-  printf '  raw/%-10s %s objects\n' "$prefix" "$n"
+  # `aws s3 ls` exits 1 on an empty prefix, which is the normal state before
+  # the first ingest run -- so it must not be allowed to trip `set -e`.
+  n="$(aws s3 ls "s3://$DATA_BUCKET/raw/$prefix/" --recursive 2>/dev/null | wc -l | tr -d ' ' || true)"
+  printf '  raw/%-10s %s objects\n' "$prefix" "${n:-0}"
 done
 
 echo

@@ -12,7 +12,10 @@ set -euo pipefail
 # scripts/, in order, and this prints that order at the end.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export AWS_PROFILE="${AWS_PROFILE:-coa-dev}"
+# Resolves AWS_PROFILE and populates TF_ARGS with everything else. The profile
+# name lives in your environment or infra/deploy.env -- never in this file.
+# shellcheck source=_common.sh
+source "$SCRIPT_DIR/_common.sh" "$@"
 
 # Storage goes first because the other two resolve its buckets by name. The
 # remaining two are independent of each other.
@@ -21,7 +24,7 @@ for layer in storage ingestion pipeline; do
   echo "############################################################"
   echo "# $layer"
   echo "############################################################"
-  "$SCRIPT_DIR/deploy-$layer.sh" -auto-approve "$@"
+  "$SCRIPT_DIR/deploy-$layer.sh" --profile "$AWS_PROFILE" -auto-approve "${TF_ARGS[@]}"
 done
 
 cat <<'NEXT'
