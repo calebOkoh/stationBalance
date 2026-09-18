@@ -2,6 +2,12 @@
 
 Modelling the effect of **weather** and **time of day / day of week** on dock capacity at Indego bikeshare stations in Philadelphia.
 
+> **Result (2026-09-18):** temporal factors account for **24.4%** of attributed
+> effect, weather for **5.4%** — time beats weather roughly 4.5 to 1, and both
+> sit behind the station's own recent history at 57.5%. Test MAE **0.5070**
+> against a 0.5581 baseline. Full write-up in **[`docs/REPORT.md`](docs/REPORT.md)**;
+> the presentation is **[`docs/Team7_StationBalance_Final.pptx`](docs/Team7_StationBalance_Final.pptx)**.
+
 This repository builds a **pre-trained model** from historical data. Nothing in it reads a live feed, serves a prediction, or runs on a schedule. Real-time inference is a design deliverable only — see [`docs/live_inference.drawio`](docs/live_inference.drawio).
 
 ---
@@ -272,6 +278,50 @@ There is no second pipeline. The model is registered and that is the end of the 
 
 What a live inference path would have to honour — the identical feature list and order from `features.json`, calendar features from `pipelines/calendarfeat.py` rather than a reimplementation, and live `station_status` supplying only the integration constant `O(s,t₀)` — is drawn in `docs/live_inference.drawio`. `calendarfeat.py` is deliberately Spark-free so that path could import the same file.
 
+### The attribution result
+
+The research question, answered. Mean absolute SHAP per factor group over a
+20,000-row test sample:
+
+| Factor group | mean \|SHAP\| | Share of total effect |
+|---|---|---|
+| lag (autoregressive history) | 0.275912 | 57.5% |
+| **temporal** | 0.117231 | **24.4%** |
+| station_static (capacity) | 0.060464 | 12.6% |
+| **weather** | 0.026006 | **5.4%** |
+
+**Time of day and day of week dominate weather by roughly 4.5 to 1.** Both are
+dwarfed by the station's own recent history, which is expected and is not a
+finding about external factors — `net_flow_same_hour_last_week` alone is the
+single largest feature in every run.
+
+**These numbers come from `station-balance/2`, not from the registered
+deliverable.** That is deliberate, and it is the one place in this project
+where the model that is served and the model that is measured are different
+objects:
+
+- The deliverable (`station-balance/1`, `models/current/`) trains with
+  `regression_l1`. It wins on MAE — 0.5070 against 0.5393 — which is what
+  section 5's choice of `net_flow` as the target implies.
+- 65% of `net_flow` values are **exactly zero**. L1's optimal constant is the
+  median, which on that target *is* zero, so an L1 fit stops early and measures
+  every feature's effect as smaller than it is. Total attributed effect is
+  0.115 under L1 against 0.480 under L2, on identical features.
+- Weather therefore reads as 0.4% under L1 and 5.4% under L2. The first number
+  is an artifact of the loss function, not a property of weather.
+
+So: L1 for the prediction, L2 for the attribution, both registered, and the
+served model unambiguous. The instruments are registered
+`PendingManualApproval` and described as do-not-serve.
+
+**A no-lag variant was run and is not the basis of anything.** The hypothesis
+was that autoregressive lags absorb weather's signal, since last Tuesday 5pm
+was also cold and wet. They do not: weather's absolute effect is *larger* with
+the lags present (0.026) than without them (0.0018). Removing them does not
+free weather's contribution, it stops the model fitting — 1837 rounds down to
+15, total effect 0.480 down to 0.057. It is kept as `station-balance/3` for the
+record. Detail in `.claude/decisions.md`.
+
 ---
 
 ## 6. Quality Gates
@@ -319,6 +369,10 @@ This validates the emission **logic**. The 6h / 72h / 30d thresholds are **prior
 3. **Tier-2 occupancy is unvalidated.** The level is a lower bound and the gap thresholds are stated priors. This is fine for the deliverable — attribution rests on Tier-1 — but any use of `pct_full` or `is_empty` as a measurement rather than an estimate is unsupported.
 4. **Two factors, not three.** The closure arm is cut (§1). If the attribution result is weaker than hoped, the absent third factor is a real candidate explanation and should be named as one.
 
+   **Resolved in the run of 2026-09-18.** The result is weak but not null: weather is 5.4% of attributed effect against temporal's 24.4% (§5). The first measurement put weather at 0.4%, which would have invited exactly the reading this item warns about — and it was an artifact of the L1 objective on a 65%-zero target, not a property of weather. The absent closure arm remains a candidate explanation for weather's modest share; a cut arm and a suppressed measurement are different problems, and only the second one turned out to be present.
+
+5. **The deliverable's metrics and its attribution come from different models.** L1 for prediction, L2 for attribution (§5). This is justified and stated, but it is a seam: anyone reading `metrics.json` from `models/current/` and `attribution.json` from `station-balance/2` is reading two models. `40_publish_model.sh --attribution-only` is what stops the instruments reaching `models/current/`, and the registry descriptions say do-not-serve.
+
 ---
 
 ## 8. Repository Layout
@@ -329,8 +383,11 @@ This validates the emission **logic**. The 6h / 72h / 30d thresholds are **prior
 ├── indego_capacity_data_sources.csv    # Source inventory with verified coverage
 ├── features.yaml                       # The feature contract (step 0.4)
 ├── docs/
+│   ├── REPORT.md                       # Full project report — findings, method, limitations
+│   ├── Team7_StationBalance_Final.pptx # Final presentation, 19 slides
 │   ├── pretrained_model.drawio         # BUILT — the training pipeline
-│   └── live_inference.drawio           # NOT BUILT — what serving would look like
+│   ├── live_inference.drawio           # NOT BUILT — what serving would look like
+│   └── before/                         # The project draft, for the before/after comparison
 ├── infra/                              # Terraform, three layers + deploy scripts
 │   ├── storage/                        # Two S3 buckets, Glue catalog, Athena, budget
 │   ├── ingestion/                      # The ingest Lambda. No schedules.

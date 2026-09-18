@@ -81,13 +81,30 @@ def baseline_mae(train: pd.DataFrame, test: pd.DataFrame) -> float:
     return float(np.abs(joined.net_flow - joined.pred).mean())
 
 
-def train_regressor(train, val, features, params) -> lgb.Booster:
-    """6.2 -- the Tier-1 target."""
+def train_regressor(train, val, features, params, objective="l1") -> lgb.Booster:
+    """6.2 -- the Tier-1 target.
+
+    `objective` is l1 for the DELIVERABLE and l2 for the attribution
+    instruments. 65% of net_flow is exactly zero, so L1's optimal constant is
+    the median -- which IS zero. Strip the lag features and nothing moves that
+    median enough to improve validation l1, so early stopping fires at
+    iteration 1 and every SHAP value collapses to a single tree. Observed on
+    station-balance-nolag-20260918T192421Z: best_iteration 1 on both targets,
+    all nine weather features at exactly 0.000000.
+
+    L2 optimises the mean, which a zero-inflated target does move, so the model
+    actually fits and the attribution means something. It is a worse fit for a
+    heavy-tailed count target, which is why the deliverable keeps L1 and only
+    the instruments use L2.
+    """
+    lgb_objective = {"l1": "regression_l1", "l2": "regression"}[objective]
+    lgb_metric = {"l1": "l1", "l2": "l2"}[objective]
+
     ds_train = lgb.Dataset(train[features], label=train.net_flow)
     ds_val = lgb.Dataset(val[features], label=val.net_flow, reference=ds_train)
 
     return lgb.train(
-        {**params, "objective": "regression_l1", "metric": "l1"},
+        {**params, "objective": lgb_objective, "metric": lgb_metric},
         ds_train,
         num_boost_round=2000,
         valid_sets=[ds_val],
@@ -151,9 +168,41 @@ def main() -> int:
     ap.add_argument("--num-leaves", type=int, default=63)
     ap.add_argument("--min-data-in-leaf", type=int, default=200)
     ap.add_argument("--shap-sample", type=int, default=20000)
+    # 6.7 -- the ATTRIBUTION variant switch.
+    #
+    # The lag group is autoregressive, and weather is autocorrelated at exactly
+    # those lags: last Tuesday 5pm was also cold and wet. So the lags carry the
+    # weather signal, SHAP credits whichever feature carries the information,
+    # and weather is left with the residual -- 0.4% on the full model.
+    #
+    # Dropping a group measures the TOTAL effect of what remains (everything
+    # the dropped group would have mediated) rather than the DIRECT effect
+    # conditional on it. A no-lag run predicts worse BY CONSTRUCTION. That is
+    # the point: it is an attribution instrument, not a candidate for
+    # models/current/.
+    ap.add_argument("--drop-feature-groups", default="",
+                    help="comma-separated feature_groups to exclude, e.g. 'lag'")
+    ap.add_argument("--objective", choices=["l1", "l2"], default="l1",
+                    help="l1 for the deliverable; l2 for attribution instruments "
+                         "(see train_regressor)")
     args, _ = ap.parse_known_args()
 
     cfg = json.loads((SOURCE_DIR / "features.json").read_text())
+
+    dropped = sorted({g.strip() for g in args.drop_feature_groups.split(",") if g.strip()})
+    if dropped:
+        unknown = [g for g in dropped if g not in cfg["feature_groups"]]
+        # Fail rather than silently train the full model: a typo'd group name
+        # would otherwise produce a run that looks like a variant and is not.
+        if unknown:
+            raise SystemExit(f"--drop-feature-groups names unknown groups: {unknown}; "
+                             f"features.json has {sorted(cfg['feature_groups'])}")
+        cfg["feature_groups"] = {k: v for k, v in cfg["feature_groups"].items()
+                                 if k not in dropped}
+        print(f"VARIANT: dropped feature groups {dropped} -- this measures the "
+              f"TOTAL effect of the remaining groups, and will predict worse "
+              f"than the full model on purpose")
+
     features = feature_columns(cfg)
 
     train = load_split(TRAIN_DIR)
@@ -184,8 +233,8 @@ def main() -> int:
     base_mae = baseline_mae(train, test)
     print(f"  (station, hour, weekday) mean MAE on test: {base_mae:.4f}")
 
-    print("\n=== 6.2 net_flow regressor ===")
-    reg = train_regressor(train, val, features, params)
+    print(f"\n=== 6.2 net_flow regressor (objective={args.objective}) ===")
+    reg = train_regressor(train, val, features, params, args.objective)
 
     print("\n=== 6.3 is_empty classifier ===")
     clf = train_classifier(train, val, features, params, scale_pos_weight)
@@ -217,6 +266,17 @@ def main() -> int:
         print("  !! GATE FAILED (pipelines.md 6.1). Revisit phase 4 feature "
               "engineering before publishing this model.")
 
+    # A model that early-stopped in the first handful of rounds is a stump, and
+    # its SHAP values are noise that LOOKS like a finding -- every feature at or
+    # near exactly zero reads as "no effect" when it actually means "never fitted".
+    # Say so next to the numbers rather than leaving it to be inferred from
+    # best_iteration.
+    degenerate = reg.best_iteration is not None and reg.best_iteration <= 5
+    if degenerate:
+        print(f"\n  !! DEGENERATE FIT: regressor best_iteration={reg.best_iteration}. "
+              f"The attribution below is a stump and does NOT support any claim "
+              f"about a feature group having no effect.")
+
     print("\n=== 6.7 SHAP attribution ===")
     sample = test.sample(min(args.shap_sample, len(test)), random_state=0)
     attribution = attribute(reg, sample, features, cfg)
@@ -232,7 +292,14 @@ def main() -> int:
                    num_iteration=reg.best_iteration)
     clf.save_model(str(MODEL_DIR / "model_is_empty.txt"),
                    num_iteration=clf.best_iteration)
-    shutil.copy(SOURCE_DIR / "features.json", MODEL_DIR / "features.json")
+    if dropped:
+        # The bundle's contract must describe the model IN the bundle. Copying
+        # the full features.json next to a variant would ship a contract naming
+        # columns the model was never trained on -- exactly the mismatch the
+        # single-source feature order exists to prevent.
+        (MODEL_DIR / "features.json").write_text(json.dumps(cfg, indent=2))
+    else:
+        shutil.copy(SOURCE_DIR / "features.json", MODEL_DIR / "features.json")
 
 
     metrics = {
@@ -244,7 +311,16 @@ def main() -> int:
         "is_empty": {"pr_auc": round(pr_auc, 6), "brier": round(brier, 6),
                      "scale_pos_weight": round(scale_pos_weight, 2),
                      "best_iteration": clf.best_iteration},
-        "gates": {"beats_baseline_6_1": bool(beats_baseline)},
+        "gates": {"beats_baseline_6_1": bool(beats_baseline),
+                  "fit_not_degenerate": not degenerate},
+        "variant": {
+            "dropped_feature_groups": dropped,
+            "objective": args.objective,
+            "role": ("attribution instrument -- measures the TOTAL effect of the "
+                     "remaining groups; predicts worse than the full model by "
+                     "construction and must NOT replace it")
+            if dropped else "full model -- the deliverable",
+        },
         "caveats": [
             "Tier-2 occupancy is diagnostically consistent but NOT externally "
             "validated: no recorded dock counts exist to check it against. It "
@@ -263,6 +339,16 @@ def main() -> int:
     (MODEL_DIR / "attribution.json").write_text(json.dumps({
         **attribution,
         "trained_at": metrics["trained_at"],
+        "dropped_feature_groups": dropped,
+        "degenerate_fit": degenerate,
+        "effect_measured": (
+            f"TOTAL effect, with {dropped} withheld so nothing mediates through them"
+            if dropped else
+            "DIRECT effect, conditional on every feature group including lag. "
+            "Because the lag features are autocorrelated with weather, they "
+            "absorb weather's signal -- read this together with the no-lag "
+            "variant, not alone"
+        ),
         "note": "Mean absolute SHAP per factor group on a random test sample. "
                 "This is the research deliverable (pipelines.md 6.7).",
     }, indent=2))

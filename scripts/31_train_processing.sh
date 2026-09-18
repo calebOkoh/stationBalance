@@ -31,6 +31,10 @@ INSTANCE="${PROCESSING_INSTANCE:-ml.t3.xlarge}"
 
 SUFFIX="${1:-$(date -u +%Y%m%dT%H%M%SZ)}"
 JOB_NAME="station-balance-$SUFFIX"
+
+# Extra flags for train.py, e.g. TRAIN_ARGS="--drop-feature-groups lag" to run
+# the attribution variant. Empty for the deliverable model.
+TRAIN_ARGS="${TRAIN_ARGS:-}"
 CODE_PREFIX="s3://$MODEL_BUCKET/code/processing"
 IMAGE="683313688378.dkr.ecr.$AWS_REGION.amazonaws.com/sagemaker-scikit-learn:1.2-1-cpu-py3"
 
@@ -88,7 +92,10 @@ for m in (lightgbm, pandas, numpy, sklearn, scipy, shap):
 mkdir -p "$SM_MODEL_DIR" /opt/ml/processing/output
 
 echo "=== phase 6 ==="
-python train.py
+# Unquoted on purpose: TRAIN_ARGS carries zero or more distinct flags and must
+# word-split. It is set from the job's --environment, so nothing outside this
+# repo can reach it.
+python train.py ${TRAIN_ARGS:-}
 
 # Package exactly as a training job would, so the publish step cannot tell the
 # difference. Contents, not the directory: tar -C then '.' keeps the members at
@@ -115,7 +122,8 @@ aws sagemaker create-processing-job \
     \"SM_CHANNEL_TRAIN\": \"/opt/ml/processing/train\",
     \"SM_CHANNEL_VALIDATION\": \"/opt/ml/processing/validation\",
     \"SM_CHANNEL_TEST\": \"/opt/ml/processing/test\",
-    \"SM_MODEL_DIR\": \"/opt/ml/processing/model\"
+    \"SM_MODEL_DIR\": \"/opt/ml/processing/model\",
+    \"TRAIN_ARGS\": \"$TRAIN_ARGS\"
   }" \
   --processing-inputs "[
     {\"InputName\": \"code\",       \"S3Input\": {\"S3Uri\": \"$CODE_PREFIX/\",                        \"LocalPath\": \"/opt/ml/processing/code\",       \"S3DataType\": \"S3Prefix\", \"S3InputMode\": \"File\", \"S3DataDistributionType\": \"FullyReplicated\"}},

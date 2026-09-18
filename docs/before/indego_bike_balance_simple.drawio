@@ -1,0 +1,64 @@
+<mxfile host="app.diagrams.net">
+  <diagram id="LL-vSVXe9W9oGkxT77yn" name="Page-1">
+    <mxGraphModel dx="1935" dy="1360" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=20;fontStyle=1;fontColor=#1a1a2e;" value="Indego Bike Balance Analytics Pipeline" vertex="1">
+          <mxGeometry height="36" width="900" x="134" y="24" as="geometry" />
+        </mxCell>
+        <mxCell id="sub" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;fontSize=11;fontStyle=2;fontColor=#555;" value="Weather · Commuter Patterns · Street Closures → Bike Balance Prediction" vertex="1">
+          <mxGeometry height="22" width="900" x="134" y="56" as="geometry" />
+        </mxCell>
+        <mxCell id="n1" parent="1" style="rounded=2;whiteSpace=wrap;html=1;fillColor=#1e88e5;strokeColor=#1565c0;fontColor=#ffffff;fontSize=12;arcSize=12;verticalAlign=middle;" value="&lt;b&gt;Data Sources&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Indego API · Weather API&lt;br&gt;Street Closures · Events&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="170" x="60" y="209" as="geometry" />
+        </mxCell>
+        <mxCell id="n2" parent="1" style="rounded=2;whiteSpace=wrap;html=1;fillColor=#43a047;strokeColor=#2e7d32;fontColor=#ffffff;fontSize=12;arcSize=12;verticalAlign=middle;" value="&lt;b&gt;Kafka&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Event Streaming&lt;br&gt;&amp; Ingestion&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="170" x="300" y="209" as="geometry" />
+        </mxCell>
+        <mxCell id="n3" parent="1" style="rounded=2;whiteSpace=wrap;html=1;fillColor=#f9a825;strokeColor=#c57d00;fontColor=#ffffff;fontSize=12;arcSize=12;verticalAlign=middle;" value="&lt;b&gt;Apache Spark / Hadoop&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Distributed Processing&lt;br&gt;ETL · Feature Engineering&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="190" x="540" y="209" as="geometry" />
+        </mxCell>
+        <mxCell id="n4" parent="1" style="rounded=2;whiteSpace=wrap;html=1;fillColor=#8e24aa;strokeColor=#6a1b9a;fontColor=#ffffff;fontSize=12;arcSize=12;verticalAlign=middle;" value="&lt;b&gt;ML Models&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Balance Prediction&lt;br&gt;Weather &amp; Event Impact&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="170" x="800" y="209" as="geometry" />
+        </mxCell>
+        <mxCell id="n5" parent="1" style="rounded=2;whiteSpace=wrap;html=1;fillColor=#2e7d32;strokeColor=#1b5e20;fontColor=#ffffff;fontSize=12;arcSize=12;verticalAlign=middle;" value="&lt;b&gt;Dashboard&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Maps · Heatmaps&lt;br&gt;Overlays · Predictions&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="170" x="1040" y="209" as="geometry" />
+        </mxCell>
+        <mxCell id="n6" parent="1" style="rounded=2;whiteSpace=wrap;html=1;fillColor=#e53935;strokeColor=#b71c1c;fontColor=#ffffff;fontSize=11;arcSize=12;verticalAlign=middle;" value="&lt;b&gt;S3 Data Lake&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:10px&#39;&gt;Raw · Processed · Features&lt;/font&gt;" vertex="1">
+          <mxGeometry height="65" width="190" x="540" y="349" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="n1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#1565c0;strokeWidth=2.5;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="n2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="n2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#2e7d32;strokeWidth=2.5;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="n3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="n3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#c57d00;strokeWidth=2;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" target="n6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="n6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b71c1c;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=1;" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="n3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#c57d00;strokeWidth=2.5;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="n4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="n4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#6a1b9a;strokeWidth=2.5;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="n5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontStyle=2;fontColor=#888;" value="&lt;span style=&quot;color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Ingest&lt;/span&gt;" vertex="1">
+          <mxGeometry height="16" width="170" x="309" y="177" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontStyle=2;fontColor=#888;" value="&lt;span style=&quot;color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Process &amp;amp; Store&lt;/span&gt;" vertex="1">
+          <mxGeometry height="16" width="190" x="537" y="172" as="geometry" />
+        </mxCell>
+        <mxCell id="l3" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontStyle=2;fontColor=#888;" value="&lt;span style=&quot;color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Predict&lt;/span&gt;" vertex="1">
+          <mxGeometry height="16" width="170" x="800" y="177" as="geometry" />
+        </mxCell>
+        <mxCell id="l4" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=9;fontStyle=2;fontColor=#888;" value="&lt;span style=&quot;color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;Visualize&lt;/span&gt;" vertex="1">
+          <mxGeometry height="16" width="170" x="1043" y="177" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
