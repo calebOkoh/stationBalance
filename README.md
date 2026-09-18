@@ -170,16 +170,56 @@ This validates the emission **logic**. The 6h / 72h / 30d thresholds are **prior
 ├── features.yaml                       # Shared feature config (step 0.4)
 ├── docs/
 │   └── aws_architecture.drawio         # Deployed AWS architecture
-├── collectors/                         # Continuous cron jobs (0.5, 1.3, 1.5)
-├── pipelines/
-│   ├── ingest/                         # Phase 1
+├── infra/                              # Terraform, four layers + deploy scripts
+│   ├── lake/                           # S3 zones, Glue catalog, Athena, budget
+│   ├── ingestion/                      # Collector Lambdas + schedules (0.5, 1.3, 1.5)
+│   ├── pipeline/                       # EMR Serverless, SageMaker role, registry
+│   ├── serving/                        # DynamoDB, Pipeline 2, HTTP API, CloudFront
+│   └── deploy-*.sh                     # One per layer, plus deploy-all.sh
+├── src/lambdas/                        # Deployed function source
+│   ├── common/                         # lakeio.py, calendarfeat.py — SHARED by both pipelines
+│   ├── ingest/                         # Phase 1 (drawio `g1`)
+│   ├── poller/                         # station_status, 5-min (drawio `g3`, step 0.5)
+│   ├── inference/                      # Pipeline 2 (drawio `inf`) + pure-Python LightGBM scorer
+│   ├── status_refresh/                 # Live dock counts (drawio `stat`)
+│   └── api/                            # Read path behind API Gateway
+├── pipelines/                          # EMR Serverless Spark jobs + SageMaker entrypoint
+│   ├── lib.py                          # Shared session/zone/config plumbing
 │   ├── conform/                        # Phase 2
 │   ├── labels/                         # Phase 3
 │   ├── features/                       # Phase 4
 │   ├── assembly/                       # Phase 5
 │   └── training/                       # Phase 6
-├── inference/                          # Pipeline 2
+├── scripts/                            # The attended running order, numbered
+│   ├── 00_preflight.sh  10_ingest.sh  20_run_phase.sh  30_train.sh  40_publish_model.sh
+│   ├── pgw_backfill.py                 # Step 1.6, one-time, run from a laptop
+│   └── build_lambdas.sh  run_tests.sh
 └── tests/
+    ├── test_recovery.py                # The 3.2/3.3 recovery GATE (needs Spark)
+    ├── test_gbdt.py                    # The inference scorer
+    └── test_calendarfeat.py            # Shared calendar features
+```
+
+### Deploying
+
+`infra/README.md` has the detail. The short version:
+
+```bash
+cd infra && ./deploy-all.sh          # lake → ingestion → pipeline → serving
+```
+
+Ingestion starts on apply and the public endpoint comes up immediately,
+returning 503 until a model exists. Everything between is attended — Pipeline 1
+"runs a handful of times, attended", so ordering comes from the numbered
+scripts rather than an orchestrator:
+
+```bash
+scripts/00_preflight.sh                     # did the deploy land? is the poller collecting?
+scripts/10_ingest.sh                        # phase 1
+python3 scripts/pgw_backfill.py --bucket …  # step 1.6, once, ever
+scripts/20_run_phase.sh conform|labels|features|assembly
+scripts/30_train.sh                         # phase 6
+scripts/40_publish_model.sh <job-name>      # step 6.8, then enable Pipeline 2
 ```
 
 ---

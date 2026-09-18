@@ -1,0 +1,120 @@
+# Shared feature configuration — pipelines.md step 0.4.
+#
+# THE contract between training (Pipeline 1, phases 4-6) and inference
+# (Pipeline 2). Both import this file. The single most common cause of
+# train/serve skew is the inference path computing a feature slightly
+# differently from the training path; pinning everything here is the defence.
+#
+# Nothing in this file may be changed without retraining.
+
+version: 1
+
+project:
+  name: station-balance
+  # Every timestamp in the system is localised to this zone before any join on
+  # the hour. Naive local time breaks at DST: one hour duplicates in November
+  # and one vanishes in March (pipelines.md 2.2).
+  timezone: America/New_York
+  # Training window. 2022 Q1 is the first quarter with a consistent schema,
+  # post-COVID demand regime, and e-bikes present (README section 9).
+  train_window_start: "2022-01-01"
+
+geo:
+  # PA State Plane South. All buffering and distance work happens here.
+  # The closure CSV export is EPSG:3857, where distances inflate ~1.29x at
+  # Philadelphia's latitude — buffering in Web Mercator gives silently wrong
+  # radii (pipelines.md 4.1).
+  projected_crs: "EPSG:2272"
+  geographic_crs: "EPSG:4326"
+  # Closure -> station association radius. A hyperparameter, not a constant:
+  # test sensitivity before trusting the closure arm (README section 9).
+  station_buffer_m: 150
+
+# Open-Meteo variable list. The historical-forecast API (training) and the
+# forecast API (inference) are both called with EXACTLY this list, in this
+# order. Adding a variable here without retraining breaks the contract.
+weather:
+  hourly:
+    - temperature_2m
+    - apparent_temperature
+    - precipitation
+    - rain
+    - snowfall
+    - wind_speed_10m
+    - wind_gusts_10m
+    - cloud_cover
+    - relative_humidity_2m
+  daily:
+    - sunrise
+    - sunset
+  # 2-4 grid points, NOT 250. The reanalysis grid is ~11 km, so nearly every
+  # station shares a cell; per-station calls are wasted quota and identical
+  # data (pipelines.md 1.8).
+  grid_points:
+    - {name: center, latitude: 39.9526, longitude: -75.1652}
+    - {name: north,  latitude: 40.0300, longitude: -75.1800}
+    - {name: south,  latitude: 39.9100, longitude: -75.1700}
+    - {name: west,   latitude: 39.9600, longitude: -75.2300}
+
+# Label reconstruction constants. These are PRIORS, not findings: step 6.6
+# would validate them and is deferred past delivery, so they ship as stated
+# (.claude/decisions.md).
+labels:
+  rebalance_short_gap_hours: 6      # g < 6h  -> reb_out/reb_in at gap midpoint
+  rebalance_long_gap_hours: 72      # 6h <= g < 72h -> edge split at +/- 1h
+  maintenance_gap_hours: 72         # g >= 72h -> same split, tagged maintenance
+  fleet_exit_days: 30               # last trip > 30d before window end -> retired
+  edge_offset_hours: 1              # the +/- 1h edge offset
+  capacity_rolling_days: 90         # rolling max(O) capacity estimate
+  min_trip_seconds: 60              # dock-repick noise below this
+  max_trip_hours: 24
+
+# Feature groups. The leakage audit (4.8) walks this list, and SHAP attribution
+# (6.7) is reported per group — the group names ARE the research deliverable.
+feature_groups:
+  weather:
+    - temperature_2m
+    - apparent_temperature
+    - precipitation
+    - rain
+    - snowfall
+    - wind_speed_10m
+    - wind_gusts_10m
+    - cloud_cover
+    - relative_humidity_2m
+  temporal:
+    - hour_sin
+    - hour_cos
+    - dow_sin
+    - dow_cos
+    - is_weekend
+    - is_holiday
+    - is_daylight
+    - month
+  closure:
+    - n_closures_nearby
+    - closed_bike_lane_m
+    - has_closure
+  station_static:
+    - capacity
+    - bike_lane_density
+    - dist_to_centroid_m
+  lag:
+    - occupancy_lag_1h
+    - net_flow_lag_1h
+    - net_flow_same_hour_last_week
+    - net_flow_rolling_7d_mean
+
+targets:
+  # Tier 1. Counted from trip endpoints, zero reconstruction error. THE
+  # training target (.claude/label-reconstruction.md).
+  regression: net_flow
+  # Tier 2. Estimated from the clamped ledger; what the web tool displays.
+  classification: is_empty
+
+# Chronological cut. NEVER random-split: it leaks future weather and future
+# station behaviour and badly inflates metrics (pipelines.md 5.2).
+split:
+  train_end: "2025-06-30"
+  val_end: "2025-12-31"
+  test_end: "2026-06-30"

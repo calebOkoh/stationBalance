@@ -1,0 +1,10 @@
+# Installed by the SageMaker script-mode container at job start.
+# Pinned: an unpinned lightgbm that changes its text model format would break
+# the pure-Python scorer in the inference Lambda, and the break would show up
+# as wrong predictions rather than an import error.
+lightgbm==4.5.0
+pandas==2.2.3
+pyarrow==17.0.0
+scikit-learn==1.5.2
+shap==0.46.0
+numpy==1.26.4
